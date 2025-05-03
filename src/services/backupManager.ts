@@ -56,7 +56,7 @@ export class BackupManager {
           location: vscode.ProgressLocation.Notification,
           title: "Version0: Running automatic backup..."
         },
-          () => this.performBackup()
+          () => this.performBackup(false)
         );
       }, intervalMinutes * 60 * 1000); // Convert minutes to milliseconds
     }
@@ -78,11 +78,10 @@ export class BackupManager {
 
   public async triggerManualBackup(): Promise<void> {
     console.log("Version0: Manual backup triggered.");
-    // No progress here, handled in WebviewProvider
-    await this.performBackup();
+    await this.performBackup(true);
   }
 
-  private async performBackup(): Promise<void> {
+  private async performBackup(isManual: boolean = false): Promise<void> {
     // Ensure workspace is open
     if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
       throw new Error("Backup failed: No workspace folder open.");
@@ -181,11 +180,22 @@ export class BackupManager {
     const branchPrefix = this.configManager.getBranchPrefix();
     const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
     const branchName = `${branchPrefix}/${timestamp}`;
-    const commitMessage = `Version0 Backup: ${timestamp}`;
+    let commitMessage = `Version0 Backup: ${timestamp}`;
+
+    // Prompt for notes only if it's a manual backup
+    if (isManual) {
+      const backupNote = await vscode.window.showInputBox({
+        prompt: "Enter optional notes for this backup",
+        placeHolder: "e.g., Refactored login component"
+      });
+      if (backupNote) {
+        commitMessage += ` - ${backupNote}`;
+      }
+    }
 
     console.log(`Version0: Starting backup process for workspace ${this.workspaceRoot}`);
     console.log(`Version0: Target Branch: ${branchName}`);
-    console.log(`Version0: Target Repo: ${targetRepoUrl}`); // We don't explicitly use this URL yet, assumes 'origin' points there
+    console.log(`Version0: Commit Message: ${commitMessage}`); // Log the potentially updated message
 
     try {
       // 1. Create new branch from current HEAD
