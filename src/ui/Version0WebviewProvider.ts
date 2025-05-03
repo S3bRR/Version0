@@ -119,18 +119,40 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						this.updateWebviewState();
 					}
 					return;
-				case 'pushCurrentState':
+				case 'pushCurrentBranch':
 					vscode.window.withProgress({
 						location: vscode.ProgressLocation.Notification,
-						title: "Version0: Pushing current state...",
+						title: "Version0: Pushing current branch...",
 						cancellable: false
 					}, async (progress) => {
 						try {
 							progress.report({ increment: 0, message: "Committing changes..." });
-							await this._backupManager.pushCurrentState();
+							const result = await this._backupManager.pushCurrentState();
 							progress.report({ increment: 100, message: "Push successful!" });
-							vscode.window.showInformationMessage('Version0: Current state committed and pushed successfully.');
-							this._view?.webview.postMessage({ command: 'updateStatus', text: `Pushed state at ${new Date().toLocaleTimeString()}` });
+							
+							let successMessage = 'Version0: Current branch pushed successfully.';
+							let actions: {title: string; command: string; arguments?: any[]}[] = [];
+
+							if (result && result.pullRequestUrl) {
+								successMessage = `Pushed branch '${result.branchName}'. Create Pull Request?`;
+								actions.push({
+									title: "Create Pull Request",
+									command: 'vscode.open',
+									arguments: [vscode.Uri.parse(result.pullRequestUrl)]
+								});
+							} else if (result) {
+								successMessage = `Version0: Branch '${result.branchName}' pushed successfully.`
+							}
+							
+							vscode.window.showInformationMessage(successMessage, ...actions.map(a => a.title))
+								.then(selection => {
+									const selectedAction = actions.find(a => a.title === selection);
+									if (selectedAction) {
+										vscode.commands.executeCommand(selectedAction.command, ...(selectedAction.arguments || []));
+									}
+								});
+
+							this._view?.webview.postMessage({ command: 'updateStatus', text: `Pushed branch at ${new Date().toLocaleTimeString()}` });
 							this.refreshBranches();
 						} catch (error) {
 							vscode.window.showErrorMessage(`Version0: Push failed: ${(error as Error).message}`);
@@ -231,7 +253,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 				</div>
 
 				<button id="backup-now">Backup Now</button>
-				<button id="push-current-state" style="margin-left: 15px;">Commit & Push Current State</button>
+				<button id="push-current-branch" style="margin-left: 15px;">Push Current Branch</button>
 
 				<div id="branch-list-container">
 					<div class="section-title">

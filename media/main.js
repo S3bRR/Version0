@@ -7,7 +7,7 @@ const saveFrequencyButton = document.getElementById('save-frequency');
 const repoInput = document.getElementById('target-repo');
 const saveRepoButton = document.getElementById('save-target-repo');
 const backupNowButton = document.getElementById('backup-now');
-const pushCurrentStateButton = document.getElementById('push-current-state');
+const pushCurrentBranchButton = document.getElementById('push-current-branch');
 const refreshBranchesButton = document.getElementById('refresh-branches');
 const branchList = document.getElementById('branch-list');
 const statusDiv = document.getElementById('status');
@@ -29,9 +29,9 @@ backupNowButton.addEventListener('click', () => {
     vscode.postMessage({ command: 'backupNow' });
 });
 
-pushCurrentStateButton.addEventListener('click', () => {
-    statusDiv.textContent = 'Committing and pushing current state...';
-    vscode.postMessage({ command: 'pushCurrentState' });
+pushCurrentBranchButton.addEventListener('click', () => {
+    statusDiv.textContent = 'Committing and pushing current branch...';
+    vscode.postMessage({ command: 'pushCurrentBranch' });
 });
 
 refreshBranchesButton.addEventListener('click', () => {

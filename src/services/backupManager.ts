@@ -334,7 +334,7 @@ export class BackupManager {
   // --- End Restore Functionality ---
 
   // --- Push Current State Functionality ---
-  public async pushCurrentState(): Promise<void> {
+  public async pushCurrentState(): Promise<{ branchName: string; pullRequestUrl?: string } | void> {
     await this.initializeGit();
     if (!this.git || !this.workspaceRoot) {
         throw new Error("Push failed: Not inside a Git repository or no workspace open.");
@@ -389,8 +389,33 @@ export class BackupManager {
         console.log(`Version0: Push successful for branch ${currentBranch}.`);
 
         if (this.configManager.getEnableNotifications()) {
-            vscode.window.showInformationMessage(`Version0: Pushed current state on branch '${currentBranch}' successfully.`);
+            // We show a more detailed message from the Webview provider now
+            // vscode.window.showInformationMessage(`Version0: Pushed current state on branch '${currentBranch}' successfully.`);
         }
+
+        // Construct PR URL if needed
+        let pullRequestUrl: string | undefined = undefined;
+        const targetRepoUrl = this.configManager.getTargetBackupRepoUrl(); // Get target repo URL again
+        
+        if (targetRepoUrl && currentBranch !== 'main' && currentBranch !== 'master') {
+            // Basic parsing - assumes HTTPS URL format for simplicity
+            const match = targetRepoUrl.match(/github\.com[\/|:]([\w-]+)\/([\w-]+?)(\.git)?$/i);
+            if (match && match[1] && match[2]) {
+                const owner = match[1];
+                const repo = match[2];
+                // Assuming base is 'main'. Could be made configurable.
+                pullRequestUrl = `https://github.com/${owner}/${repo}/compare/main...${encodeURIComponent(currentBranch)}?expand=1`;
+                console.log(`Version0: Generated PR URL: ${pullRequestUrl}`);
+            } else {
+                console.warn(`Version0: Could not parse owner/repo from target URL '${targetRepoUrl}' to generate PR link.`);
+            }
+        }
+
+        // Return result object
+        return {
+            branchName: currentBranch,
+            pullRequestUrl: pullRequestUrl
+        };
 
     } catch (error: any) {
         console.error("Version0: Push current state operation failed:", error);
