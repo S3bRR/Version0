@@ -210,6 +210,11 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 		// Get URI to script on disk, then convert it to a URI webviews can load
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.js'));
 
+		// Get URI for toolkit
+		const toolkitUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode/webview-ui-toolkit', 'dist', 'toolkit.js')); // Assuming installed
+		// OR Use CDN - Simpler for now if toolkit not bundled
+		// const toolkitUri = "https://unpkg.com/@vscode/webview-ui-toolkit@latest"; // Requires network
+
 		// Use a nonce to only allow specific scripts to be run
 		const nonce = getNonce();
 
@@ -217,55 +222,162 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 			<html lang="en">
 			<head>
 				<meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+				<!-- Use a content security policy to only allow loading specific resources -->
+				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https:; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
-				<title>Version0 Settings</title>
+				
+				<!-- If installed via npm:
+				<script type="module" nonce="${nonce}" src="${toolkitUri}"></script> 
+				-->
+				 <!-- Using CDN requires adjusting CSP script-src if needed -->
+				 <script type="module" nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/@vscode/webview-ui-toolkit@1/dist/toolkit.min.js"></script>
+
+				<title>Version0 Backup</title>
 				<style>
-					body { font-family: sans-serif; padding: 10px; }
-					label { display: block; margin-bottom: 5px; }
-					input[type="number"], input[type="text"] { width: 80%; padding: 4px; margin-bottom: 10px; }
-					button { padding: 5px 10px; margin-left: 5px; cursor: pointer; margin-bottom: 5px; }
-					.setting-row { display: flex; align-items: center; margin-bottom: 15px; }
-					.setting-row label { white-space: nowrap; }
-					.setting-row input { flex-grow: 1; margin-right: 5px; margin-left: 5px; }
-					#status { margin-top: 15px; font-style: italic; font-size: 0.9em; }
-					#branch-list-container { margin-top: 20px; }
-					#branch-list { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; border: 1px solid #ccc; }
-					#branch-list li { padding: 5px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.9em; }
-					#branch-list li:hover { background-color: #f0f0f0; }
-					#branch-list li:last-child { border-bottom: none; }
-					.section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+					/* Basic Reset & Body */
+					body {
+						font-family: var(--vscode-font-family);
+						color: var(--vscode-foreground);
+						background-color: var(--vscode-sideBar-background);
+						padding: 10px 15px;
+						box-sizing: border-box;
+					}
+					h3, h4 {
+						color: var(--vscode-sideBar-titleForeground);
+						margin-top: 10px;
+						margin-bottom: 8px;
+					}
+					/* Layout */
+					.container {
+						display: flex;
+						flex-direction: column;
+						gap: 15px; /* Space between sections */
+					}
+					.setting-row {
+						display: flex;
+						align-items: center;
+						gap: 8px; /* Space within a row */
+						margin-bottom: 8px;
+					}
+					.setting-row label {
+						white-space: nowrap;
+						font-size: var(--vscode-font-size);
+					}
+					 /* Make text field take available space */
+					vscode-text-field {
+						flex-grow: 1;
+					}
+					 /* Buttons */
+					.button-group {
+						display: flex;
+						gap: 8px;
+						margin-top: 5px;
+					}
+					vscode-button {
+						/* Default button styling is usually fine */
+						min-width: 60px; /* Prevent tiny save buttons */
+					}
+					 vscode-button[appearance="secondary"] {
+						 /* Style secondary buttons if needed */
+					 }
+					#auth-button-container {
+						 margin-top: 10px;
+					 }
+					/* Branch List */
+					#branch-list-container {
+						margin-top: 10px;
+					}
+					.section-title {
+						display: flex;
+						justify-content: space-between;
+						align-items: center;
+						margin-bottom: 5px;
+						border-bottom: 1px solid var(--vscode-editorGroupHeader-tabsBorder);
+						padding-bottom: 4px;
+					}
+					.section-title h4 {
+						 margin: 0;
+					 }
+					#refresh-branches {
+						/* Style refresh as an icon button if possible or smaller */
+						min-width: auto;
+						padding: 2px 6px;
+					}
+					#branch-list {
+						list-style: none;
+						padding: 5px;
+						margin: 0;
+						max-height: 200px;
+						overflow-y: auto;
+						border: 1px solid var(--vscode-input-border, var(--vscode-contrastBorder));
+						border-radius: var(--input-corner-radius, 3px); 
+						background: var(--vscode-input-background);
+					}
+					#branch-list li {
+						padding: 6px 8px;
+						border-bottom: 1px solid var(--vscode-editorGroupHeader-tabsBorder);
+						cursor: pointer;
+						font-size: var(--vscode-font-size);
+						color: var(--vscode-foreground);
+						overflow: hidden;
+						text-overflow: ellipsis;
+						white-space: nowrap;
+					}
+					#branch-list li:hover {
+						background-color: var(--vscode-list-hoverBackground);
+						color: var(--vscode-list-hoverForeground);
+					}
+					#branch-list li:last-child {
+						border-bottom: none;
+					}
+					/* Status Area */
+					#status {
+						margin-top: 15px;
+						font-style: italic;
+						font-size: calc(var(--vscode-font-size) * 0.9);
+						color: var(--vscode-descriptionForeground);
+					}
 				</style>
 			</head>
 			<body>
-				<h3>Version0 Backup</h3>
+				<div class="container">
+					<h3>Version0 Backup</h3>
 
-				<div class="setting-row">
-					<label for="frequency">Frequency (min):</label>
-					<input type="number" id="frequency" value="" min="1">
-					<button id="save-frequency">Save</button>
-				</div>
-
-				<div class="setting-row">
-					<label for="target-repo">Target Repo URL:</label>
-					<input type="text" id="target-repo" value="" placeholder="e.g., https://github.com/owner/repo.git">
-					<button id="save-target-repo">Save</button>
-				</div>
-
-				<button id="backup-now">Backup Now</button>
-				<button id="push-current-branch" style="margin-left: 15px;">Push Current Branch</button>
-
-				<div id="branch-list-container">
-					<div class="section-title">
-						<h4>Backup Branches</h4>
-						<button id="refresh-branches" title="Refresh Branch List">&#x21bb;</button>
+					<div class="setting-row">
+						<label for="frequency">Frequency (min):</label>
+						<vscode-text-field type="number" id="frequency" value="" min="1"></vscode-text-field>
+						<vscode-button appearance="secondary" id="save-frequency">Save</vscode-button>
 					</div>
-					<ul id="branch-list">
-						<li>Loading branches...</li>
-					</ul>
-				</div>
 
-				<div id="status">Loading...</div>
+					<div class="setting-row">
+						<label for="target-repo">Target Repo URL:</label>
+						<vscode-text-field id="target-repo" value="" placeholder="e.g., https://github.com/owner/repo.git"></vscode-text-field>
+						<vscode-button appearance="secondary" id="save-target-repo">Save</vscode-button>
+					</div>
+
+					<div class="button-group">
+						<vscode-button id="backup-now">Backup Now</vscode-button>
+						<vscode-button id="push-current-branch">Push Current Branch</vscode-button>
+					</div>
+
+					<div id="branch-list-container">
+						<div class="section-title">
+							<h4>Backup Branches</h4>
+							<vscode-button appearance="icon" id="refresh-branches" title="Refresh Branch List">
+								<span class="codicon codicon-refresh"></span> <!-- Requires CSP adjustment for codicon font -->
+							</vscode-button>
+						</div>
+						<ul id="branch-list">
+							<li>Loading branches...</li>
+						</ul>
+					</div>
+
+					<div id="auth-button-container" style="display: none;">
+						<vscode-button appearance="primary" id="auth-button">Authenticate with GitHub</vscode-button>
+					</div>
+
+					<div id="status">Loading...</div>
+				</div>
 
 				<script nonce="${nonce}" src="${scriptUri}"></script>
 			</body>
