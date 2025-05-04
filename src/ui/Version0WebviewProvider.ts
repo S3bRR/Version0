@@ -78,6 +78,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 							progress.report({ increment: 100, message: "Backup successful!" });
 							vscode.window.showInformationMessage('Version0: Manual backup completed successfully.');
 							this._view?.webview.postMessage({ command: 'updateStatus', text: `Last backup: ${new Date().toLocaleTimeString()}` });
+							this.refreshBranches();
 						} catch (error) {
 							vscode.window.showErrorMessage(`Version0: Backup failed: ${(error as Error).message}`);
 							this._view?.webview.postMessage({ command: 'updateStatus', text: `Backup failed: ${(error as Error).message}` });
