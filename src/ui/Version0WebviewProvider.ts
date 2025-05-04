@@ -161,6 +161,47 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						}
 					});
 					return;
+				case 'requestRestore': // New case to handle confirmation
+					const branchToRequestRestore = message.branchName;
+					if (!branchToRequestRestore) return;
+
+					// Show VS Code native confirmation
+					const confirmation = await vscode.window.showWarningMessage(
+						`Restore workspace to backup branch '${branchToRequestRestore}'? This will overwrite local changes and requires a workspace reload.`,
+						{ modal: true }, // Make it modal
+						'Restore' // Confirmation button text
+					);
+
+					if (confirmation === 'Restore') {
+						// User confirmed, proceed with restore
+						vscode.window.withProgress({
+							location: vscode.ProgressLocation.Notification,
+							title: `Version0: Restoring from ${branchToRequestRestore}...`,
+							cancellable: false
+						}, async (progress) => {
+							try {
+								progress.report({ increment: 0, message: "Starting restore..." });
+								await this._backupManager.restoreFromBackup(branchToRequestRestore);
+								progress.report({ increment: 100, message: "Restore successful!" });
+								// It's often good practice to reload the window after a restore
+								// to ensure all file states and UI elements are updated correctly.
+								vscode.window.showInformationMessage(`Restored from ${branchToRequestRestore}. Reload window to see changes?`, "Reload Window")
+									.then(selection => {
+										if (selection === "Reload Window") {
+											vscode.commands.executeCommand('workbench.action.reloadWindow');
+										}
+									});
+								this._view?.webview.postMessage({ command: 'updateStatus', text: `Restored from ${branchToRequestRestore} at ${new Date().toLocaleTimeString()}` });
+							} catch (error) {
+								this._view?.webview.postMessage({ command: 'updateStatus', text: `Restore failed: ${(error as Error).message}` });
+								// Keep the error message from BackupManager being shown too
+							}
+						});
+					} else {
+						// User cancelled
+						this._view?.webview.postMessage({ command: 'updateStatus', text: 'Restore cancelled.' });
+					}
+					return;
 			}
 		}, undefined, this.context.subscriptions);
 

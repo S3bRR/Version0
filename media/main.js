@@ -63,10 +63,12 @@ function renderBranches(branches) {
             li.dataset.branchName = branchName; // Store full name (needed for restore)
             li.title = `Click to restore from ${branchName}`;
             li.addEventListener('click', () => {
-                if (confirm(`Are you sure you want to restore your workspace to the state of branch '${branchName}'? This will overwrite local changes.`)) {
-                    statusDiv.textContent = `Initiating restore from ${branchName}...`;
-                    vscode.postMessage({ command: 'restoreBackup', branchName: branchName });
-                }
+                // Removed confirm() call due to sandbox restrictions
+                // if (confirm(`Are you sure you want to restore your workspace to the state of branch '${branchName}'? This will overwrite local changes.`)) {
+                    statusDiv.textContent = `Requesting restore confirmation for ${branchName}...`;
+                    // Send a request to the extension host to show a confirmation prompt
+                    vscode.postMessage({ command: 'requestRestore', branchName: branchName }); 
+                // }
             });
             branchList.appendChild(li);
         });

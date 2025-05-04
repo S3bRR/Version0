@@ -46,7 +46,7 @@
         {
           "type": "webview",
           "id": "version0.webviewView",
-          "name": "Version0 Backup",
+          "name": "Version0",
           "contextualTitle": "Version0"
         }
       ]
