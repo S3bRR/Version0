@@ -3,6 +3,7 @@
   "displayName": "Version0",
   "description": "Automatically create backup branches on GitHub repositories",
   "version": "0.1.0",
+  "publisher": "v0Design",
   "icon": "Version0_image.png",
   "engines": {
     "vscode": "^1.60.0"
@@ -64,11 +65,6 @@
           "type": "string",
           "default": "",
           "description": "The URL of the GitHub repository (HTTPS or SSH) where backup branches will be pushed."
-        },
-        "version0.branchPrefix": {
-          "type": "string",
-          "default": "backup",
-          "description": "Prefix for backup branch names (e.g., backup/YYYY-MM-DD_HH-mm-ss)"
         },
         "version0.enableNotifications": {
           "type": "boolean",

@@ -177,10 +177,50 @@ export class BackupManager {
       }
     }
 
-    const branchPrefix = this.configManager.getBranchPrefix();
-    const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
-    const branchName = `${branchPrefix}/${timestamp}`;
-    let commitMessage = `Version0 Backup: ${timestamp}`;
+    // --- Calculate Next Version Branch Name ---
+    let nextVersion = '1.0'; // Default starting version
+    try {
+      console.log("Version0: Fetching existing backup branches to determine next version...");
+      // Fetch branches starting with \'v\' from the target repo
+      if (!targetRepoUrl) {
+        throw new Error("Cannot fetch branches: Target repository URL is not defined.");
+      }
+      const existingBranches = await this.githubService.getBackupBranchesFromTargetUrl(targetRepoUrl); 
+      
+      let maxMajor = 0;
+      let maxMinor = -1; // Start minor at -1 to correctly handle v1.0 start
+
+      existingBranches.forEach(branch => {
+        // Regex to capture vX.Y from the start of the branch name
+        const match = branch.match(/^v(\d+)\.(\d+)/);
+        if (match) {
+          const major = parseInt(match[1], 10);
+          const minor = parseInt(match[2], 10);
+
+          if (major > maxMajor) {
+            maxMajor = major;
+            maxMinor = minor;
+          } else if (major === maxMajor && minor > maxMinor) {
+            maxMinor = minor;
+          }
+        }
+      });
+
+      if (maxMinor !== -1) { // Found existing versions
+        nextVersion = `${maxMajor}.${maxMinor + 1}`;
+      } // Otherwise, stick with default v1.0
+      
+      console.log(`Version0: Determined next version: ${nextVersion}`);
+
+    } catch (branchError: any) {
+      // Log the error but proceed with default v1.0 - maybe notify user?
+      console.error("Version0: Error fetching or parsing existing branches, starting with v1.0:", branchError); 
+      vscode.window.showWarningMessage("Could not determine next version number from existing branches. Starting with v1.0.");
+    }
+    
+    const timestamp = moment().format('YYYY-MM-DD_HH-mm'); // Use HH-mm for 24h format
+    const branchName = `v${nextVersion}/${timestamp}`;
+    let commitMessage = `Version0 Backup: v${nextVersion} - ${timestamp}`;
 
     // Prompt for notes only if it's a manual backup
     if (isManual) {

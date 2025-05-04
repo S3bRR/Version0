@@ -167,36 +167,41 @@ export class GithubService implements vscode.Disposable {
 
   // TODO: Add method for cleaning up old branches (maybe based on local branches?)
 
-  async getBackupBranchesFromTargetUrl(targetRepoUrl: string, prefix: string): Promise<string[]> {
+  async getBackupBranchesFromTargetUrl(targetRepoUrl: string): Promise<string[]> {
     const octokit = this.octokit;
+    console.log(`[GithubService] getBackupBranchesFromTargetUrl called with URL: ${targetRepoUrl}`);
+    console.log(`[GithubService] Octokit initialized: ${!!octokit}`);
     if (!octokit) {
-        console.warn("getBackupBranchesFromTargetUrl called when Octokit is not initialized.");
+        console.warn("[GithubService] getBackupBranchesFromTargetUrl called when Octokit is not initialized.");
         return [];
     }
 
     const repoInfo = this.parseRepoUrl(targetRepoUrl);
+    console.log(`[GithubService] Parsed repo info:`, repoInfo);
     if (!repoInfo) {
-        console.error(`Could not parse owner/repo from target URL: ${targetRepoUrl}`);
+        console.error(`[GithubService] Could not parse owner/repo from target URL: ${targetRepoUrl}`);
         return [];
     }
 
     const { owner, repo } = repoInfo;
+    const prefix = "v"; // Hardcode prefix for version search
 
     try {
-      // List refs matching the backup prefix
-      console.log(`Fetching backup branches for ${owner}/${repo} with prefix ${prefix}`);
+      // List refs matching the version prefix
+      console.log(`[GithubService] Calling listMatchingRefs for ${owner}/${repo} with ref: heads/${prefix}`);
       const refs = await octokit.paginate(octokit.git.listMatchingRefs, {
         owner,
         repo,
-        ref: `heads/${prefix}/`
+        ref: `heads/${prefix}` // Fetch all refs starting with v
       });
+      console.log('[GithubService] Raw refs received:', refs);
 
       // Extract branch names from refs
-      const branchNames = refs.map((ref: { ref: string }) => ref.ref.replace(/^refs\/heads\//, '')); // Keep full branch name
-      console.log(`Found branches:`, branchNames);
+      const branchNames = refs.map((ref: { ref: string }) => ref.ref.replace(/^refs\/heads\//, '')); 
+      console.log(`[GithubService] Found version branches:`, branchNames);
       return branchNames;
     } catch (error: any) {
-      console.error(`Error listing backup branches for ${owner}/${repo} with prefix ${prefix}:`, error);
+      console.error(`[GithubService] Error listing backup branches for ${owner}/${repo} with prefix ${prefix}:`, error);
       vscode.window.showErrorMessage(`Failed to list backup branches for ${owner}/${repo}: ${error.message}`);
       return [];
     }

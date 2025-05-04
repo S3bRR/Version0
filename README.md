@@ -1,6 +1,43 @@
-# Version0
+# Version0 - GitHub Backup Extension
 
-A VS Code/Cursor extension for automatic GitHub repository backup.
+Automatically creates versioned backup branches of your current workspace to a specified GitHub repository.
+
+**Features:**
+
+*   **Automatic Backups:** Periodically backs up your entire workspace.
+*   **Manual Backups:** Trigger backups on demand with optional notes.
+*   **Local Git Operations:** Uses standard `git` commands locally.
+*   **Versioned Branches:** Creates branches like `v1.0/YYYY-MM-DD_HH-mm`, automatically incrementing the version.
+*   **Target Repository:** Pushes backups to a single configured remote GitHub repository (using HTTPS or SSH URL).
+*   **Restore:** Easily checkout previous backup branches.
+*   **Push Current Branch:** Safely commit and push your current working branch, with an option to open a Pull Request URL.
+*   **Webview UI:** Configure settings, view backup branches, and trigger actions from the VS Code sidebar.
+*   **GitHub Authentication:** Uses VS Code's built-in GitHub authentication.
+
+**Usage:**
+
+1.  Install the extension.
+2.  Open the Version0 view in the VS Code activity bar.
+3.  Authenticate with GitHub if prompted.
+4.  Set the **Target Repo URL** (e.g., `https://github.com/your-username/my-backup-repo.git`) in the view. Ensure this repository exists on GitHub.
+5.  Set the desired **Backup Frequency** (in minutes).
+6.  Use the buttons to "Backup Now", "Push Current Branch", or refresh/restore from the branch list.
+
+**Configuration:**
+
+*   `version0.targetBackupRepoUrl`: The URL of the GitHub repository for backups.
+*   `version0.backupInterval`: Automatic backup interval in minutes (0 disables automatic backups).
+*   `version0.enableNotifications`: Show status notifications (default: true).
+*   `version0.autoStart`: Start automatic backups when VS Code starts (default: false).
+
+**Requirements:**
+
+*   `git` command-line tool installed and in your system's PATH.
+*   A GitHub account.
+
+**License:**
+
+[MIT](LICENSE)
 
 ## Features
 

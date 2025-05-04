@@ -41,10 +41,6 @@ export class ConfigManager {
     return this.configuration.get<number>('backupInterval') || 10;
   }
   
-  getBranchPrefix(): string {
-    return this.configuration.get<string>('branchPrefix') || 'backup';
-  }
-  
   getEnableNotifications(): boolean {
     return this.configuration.get<boolean>('enableNotifications') || true;
   }
@@ -56,10 +52,6 @@ export class ConfigManager {
   // Settings setters
   async setBackupInterval(interval: number): Promise<void> {
     await this.configuration.update('backupInterval', interval, vscode.ConfigurationTarget.Global);
-  }
-  
-  async setBranchPrefix(prefix: string): Promise<void> {
-    await this.configuration.update('branchPrefix', prefix, vscode.ConfigurationTarget.Global);
   }
   
   async setEnableNotifications(enable: boolean): Promise<void> {

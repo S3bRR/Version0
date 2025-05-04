@@ -170,26 +170,36 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 	// Helper to fetch and send branches
 	public async refreshBranches() {
 		if (!this._view) return; // Exit if view is not ready
+		console.log('[WebviewProvider] refreshBranches called.');
 
 		this._view.webview.postMessage({ command: 'updateStatus', text: 'Fetching branches...' });
 		try {
 			const targetUrl = this._configManager.getTargetBackupRepoUrl();
-			const prefix = this._configManager.getBranchPrefix();
+			console.log(`[WebviewProvider] Target URL: ${targetUrl}`);
 			if (!targetUrl) {
+				console.log('[WebviewProvider] Target URL is missing.');
 				this._view.webview.postMessage({ command: 'updateBranches', branches: [] });
 				this._view.webview.postMessage({ command: 'updateStatus', text: 'Set target repository URL to list branches.' });
 				return;
 			}
 
-			if (!await this._githubService.isAuthenticated()) {
+			const isAuthenticated = await this._githubService.isAuthenticated();
+			console.log(`[WebviewProvider] Is Authenticated: ${isAuthenticated}`);
+			if (!isAuthenticated) {
+				console.log('[WebviewProvider] Not authenticated.');
 				this._view.webview.postMessage({ command: 'updateBranches', branches: [] });
 				this._view.webview.postMessage({ command: 'updateStatus', text: 'GitHub Auth Required to list branches.' });
 				return;
 			}
-			const branches = await this._githubService.getBackupBranchesFromTargetUrl(targetUrl, prefix);
+			console.log('[WebviewProvider] Calling getBackupBranchesFromTargetUrl...');
+			const branches = await this._githubService.getBackupBranchesFromTargetUrl(targetUrl);
+			console.log(`[WebviewProvider] Received branches from service:`, branches);
+
+			console.log('[WebviewProvider] Posting updateBranches message to webview.');
 			this._view.webview.postMessage({ command: 'updateBranches', branches: branches });
 			// Don't override status here, let the webview script do it
 		} catch (error) {
+			console.error('[WebviewProvider] Error refreshing branches:', error);
 			this._view.webview.postMessage({ command: 'updateBranches', branches: [] });
 			this._view.webview.postMessage({ command: 'updateStatus', text: `Error fetching branches: ${(error as Error).message}` });
 		}
@@ -341,8 +351,6 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 			</head>
 			<body>
 				<div class="container">
-					<h3>Version0 Backup</h3>
-
 					<div class="setting-row">
 						<label for="frequency">Frequency (min):</label>
 						<vscode-text-field type="number" id="frequency" value="" min="1"></vscode-text-field>
