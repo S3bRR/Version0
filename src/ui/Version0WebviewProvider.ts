@@ -62,6 +62,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						await this._configManager.setTargetBackupRepoUrl(repoUrl);
 						this._view?.webview.postMessage({ command: 'targetRepoSaved', value: repoUrl });
 						vscode.window.showInformationMessage(`Target backup repository set to ${repoUrl}.`);
+						this.refreshBranches();
 					} else {
 						vscode.window.showErrorMessage('Invalid repository URL format.');
 					}
@@ -212,32 +213,24 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 	// Helper to fetch and send branches
 	public async refreshBranches() {
 		if (!this._view) return; // Exit if view is not ready
-		console.log('[WebviewProvider] refreshBranches called.');
 
 		this._view.webview.postMessage({ command: 'updateStatus', text: 'Fetching branches...' });
 		try {
 			const targetUrl = this._configManager.getTargetBackupRepoUrl();
-			console.log(`[WebviewProvider] Target URL: ${targetUrl}`);
 			if (!targetUrl) {
-				console.log('[WebviewProvider] Target URL is missing.');
 				this._view.webview.postMessage({ command: 'updateBranches', branches: [] });
 				this._view.webview.postMessage({ command: 'updateStatus', text: 'Set target repository URL to list branches.' });
 				return;
 			}
 
 			const isAuthenticated = await this._githubService.isAuthenticated();
-			console.log(`[WebviewProvider] Is Authenticated: ${isAuthenticated}`);
 			if (!isAuthenticated) {
-				console.log('[WebviewProvider] Not authenticated.');
 				this._view.webview.postMessage({ command: 'updateBranches', branches: [] });
 				this._view.webview.postMessage({ command: 'updateStatus', text: 'GitHub Auth Required to list branches.' });
 				return;
 			}
-			console.log('[WebviewProvider] Calling getBackupBranchesFromTargetUrl...');
 			const branches = await this._githubService.getBackupBranchesFromTargetUrl(targetUrl);
-			console.log(`[WebviewProvider] Received branches from service:`, branches);
 
-			console.log('[WebviewProvider] Posting updateBranches message to webview.');
 			this._view.webview.postMessage({ command: 'updateBranches', branches: branches });
 			// Don't override status here, let the webview script do it
 		} catch (error) {

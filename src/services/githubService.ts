@@ -169,15 +169,12 @@ export class GithubService implements vscode.Disposable {
 
   async getBackupBranchesFromTargetUrl(targetRepoUrl: string): Promise<string[]> {
     const octokit = this.octokit;
-    console.log(`[GithubService] getBackupBranchesFromTargetUrl called with URL: ${targetRepoUrl}`);
-    console.log(`[GithubService] Octokit initialized: ${!!octokit}`);
     if (!octokit) {
         console.warn("[GithubService] getBackupBranchesFromTargetUrl called when Octokit is not initialized.");
         return [];
     }
 
     const repoInfo = this.parseRepoUrl(targetRepoUrl);
-    console.log(`[GithubService] Parsed repo info:`, repoInfo);
     if (!repoInfo) {
         console.error(`[GithubService] Could not parse owner/repo from target URL: ${targetRepoUrl}`);
         return [];
@@ -186,18 +183,14 @@ export class GithubService implements vscode.Disposable {
     const { owner, repo } = repoInfo;
 
     try {
-      // List refs matching the version prefix
-      console.log(`[GithubService] Calling listMatchingRefs for ${owner}/${repo} to get branches starting with 'v' (heads/v*)`);
       const refs = await octokit.paginate(octokit.git.listMatchingRefs, {
         owner,
         repo,
         ref: 'heads/v' // Fetch only branches starting with 'v'
       });
-      console.log('[GithubService] Raw refs received (v* branches):', refs);
 
       // Extract branch names from refs
       const branchNames = refs.map((ref: { ref: string }) => ref.ref.replace(/^refs\/heads\//, ''));
-      console.log(`[GithubService] Found version branches:`, branchNames);
       return branchNames;
     } catch (error: any) {
       console.error(`[GithubService] Error listing version branches for ${owner}/${repo}:`, error);
