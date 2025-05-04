@@ -89,7 +89,7 @@ Version0 automatically creates backup branches on GitHub repositories at specifi
 
 Access settings via the gear icon in the Version0 view:
 
-- **Backup Interval**: Time between automatic backups (default: 10 minutes)
+- **Backup Interval**: Time between automatic backups (default: 30 minutes)
 - **Branch Prefix**: Prefix for backup branch names (default: "backup")
 - **Maximum Backups**: Maximum number of backup branches to retain (default: 10)
 - **Auto-Cleanup**: Enable automatic removal of old backup branches

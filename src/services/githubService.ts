@@ -184,25 +184,24 @@ export class GithubService implements vscode.Disposable {
     }
 
     const { owner, repo } = repoInfo;
-    const prefix = "v"; // Hardcode prefix for version search
 
     try {
       // List refs matching the version prefix
-      console.log(`[GithubService] Calling listMatchingRefs for ${owner}/${repo} with ref: heads/${prefix}`);
+      console.log(`[GithubService] Calling listMatchingRefs for ${owner}/${repo} to get branches starting with 'v' (heads/v*)`);
       const refs = await octokit.paginate(octokit.git.listMatchingRefs, {
         owner,
         repo,
-        ref: `heads/${prefix}` // Fetch all refs starting with v
+        ref: 'heads/v' // Fetch only branches starting with 'v'
       });
-      console.log('[GithubService] Raw refs received:', refs);
+      console.log('[GithubService] Raw refs received (v* branches):', refs);
 
       // Extract branch names from refs
-      const branchNames = refs.map((ref: { ref: string }) => ref.ref.replace(/^refs\/heads\//, '')); 
+      const branchNames = refs.map((ref: { ref: string }) => ref.ref.replace(/^refs\/heads\//, ''));
       console.log(`[GithubService] Found version branches:`, branchNames);
       return branchNames;
     } catch (error: any) {
-      console.error(`[GithubService] Error listing backup branches for ${owner}/${repo} with prefix ${prefix}:`, error);
-      vscode.window.showErrorMessage(`Failed to list backup branches for ${owner}/${repo}: ${error.message}`);
+      console.error(`[GithubService] Error listing version branches for ${owner}/${repo}:`, error);
+      vscode.window.showErrorMessage(`Failed to list version branches for ${owner}/${repo}: ${error.message}`);
       return [];
     }
   }

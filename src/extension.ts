@@ -29,11 +29,6 @@ export async function activate(context: vscode.ExtensionContext) {
     webviewProvider?.updateWebviewState();
   });
   
-  const authenticateCommand = vscode.commands.registerCommand('version0.authenticateGitHub', async () => {
-    await githubService?.authenticate();
-    webviewProvider?.updateWebviewState();
-  });
-  
   const triggerBackupCommand = vscode.commands.registerCommand('version0.triggerBackup', async () => {
     vscode.window.showInformationMessage('Please use the "Backup Now" button in the Version0 sidebar view.');
   });
@@ -41,7 +36,6 @@ export async function activate(context: vscode.ExtensionContext) {
   // Register disposables
   context.subscriptions.push(
     startCommand,
-    authenticateCommand,
     triggerBackupCommand,
     githubService
   );

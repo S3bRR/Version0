@@ -35,9 +35,12 @@ pushCurrentBranchButton.addEventListener('click', () => {
 });
 
 refreshBranchesButton.addEventListener('click', () => {
+    console.log("Refresh branches button clicked!");
     statusDiv.textContent = 'Requesting branch list...';
     branchList.innerHTML = '<li>Fetching...</li>'; // Clear old list
+    console.log("Posting 'getBranches' message...");
     vscode.postMessage({ command: 'getBranches' });
+    console.log("Message 'getBranches' posted.");
 });
 
 authButton.addEventListener('click', () => {
