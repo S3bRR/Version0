@@ -12,34 +12,66 @@ export class BackupManager {
   private timer: NodeJS.Timeout | undefined;
   private git: SimpleGit | undefined;
   private workspaceRoot: string | undefined;
+  private static readonly BACKUP_REMOTE_NAME = 'version0_backup_target'; // Dedicated remote name
 
   constructor(githubService: GithubService, configManager: ConfigManager) {
     this.githubService = githubService;
     this.configManager = configManager;
-    this.initializeGit();
+    this.initializeGit().catch(err => {
+        console.error("Version0: Failed to initialize Git on construction:", err.message);
+        // Non-critical here, as it will be re-attempted before operations
+    });
   }
 
-  private async initializeGit(): Promise<void> {
-    this.workspaceRoot = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0
-      ? vscode.workspace.workspaceFolders[0].uri.fsPath
+  private async initializeGit(forceReInit: boolean = false): Promise<boolean> {
+    const currentWorkspaceFolders = vscode.workspace.workspaceFolders;
+    const newWorkspaceRoot = currentWorkspaceFolders && currentWorkspaceFolders.length > 0
+      ? currentWorkspaceFolders[0].uri.fsPath
       : undefined;
 
-    if (!this.workspaceRoot) {
+    if (!newWorkspaceRoot) {
       this.git = undefined;
-      return;
+      this.workspaceRoot = undefined;
+      console.warn("Version0: No workspace folder open. Git operations disabled.");
+      return false;
     }
 
+    // If workspace hasn't changed and git is already initialized (and not forcing re-init), do nothing
+    if (this.git && this.workspaceRoot === newWorkspaceRoot && !forceReInit) {
+        try {
+            // Quick check to see if git instance is still valid
+            await this.git.status();
+            return true;
+        } catch (e) {
+            console.warn("Version0: Existing Git instance seems invalid, re-initializing.");
+            // Proceed to re-initialize
+        }
+    }
+    
+    this.workspaceRoot = newWorkspaceRoot; // Set new root
+
     try {
+      // Validate path existence before passing to simpleGit
+      if (!await fs.stat(this.workspaceRoot).then(s => s.isDirectory()).catch(() => false)) {
+          console.error(`Version0: Workspace root path does not exist or is not a directory: ${this.workspaceRoot}`);
+          this.git = undefined;
+          return false;
+      }
+
       this.git = simpleGit(this.workspaceRoot);
       const isRepo = await this.git.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
       if (!isRepo) {
-        this.git = undefined;
-        this.workspaceRoot = undefined; // Clear root if not a repo
+        // This case is handled more gracefully in performBackup/pushCurrentState with a prompt to init
+        console.warn(`Version0: Workspace '${path.basename(this.workspaceRoot)}' is not a Git repository.`);
+        this.git = undefined; // Mark as not usable until initialized
+        return false; 
       }
-    } catch (error) {
-      console.error("Version0: Error initializing simple-git:", error);
+      console.log(`Version0: Git initialized successfully for ${this.workspaceRoot}`);
+      return true;
+    } catch (error: any) {
+      console.error(`Version0: Error initializing simple-git for ${this.workspaceRoot}: ${error.message}`);
       this.git = undefined;
-      this.workspaceRoot = undefined;
+      return false;
     }
   }
 
@@ -74,98 +106,119 @@ export class BackupManager {
     await this.performBackup(true);
   }
 
+  private async tryFixGitCorruption(): Promise<boolean> {
+    if (!this.git || !this.workspaceRoot) {
+      console.log(`Version0: Cannot fix git corruption - git or workspaceRoot not initialized`);
+      return false;
+    }
+
+    try {
+      console.log(`Version0: Attempting to fix potential git index corruption...`);
+      
+      // Try to remove any voicetype reference from the index
+      try {
+        await this.git.raw(['rm', '--cached', '-r', '-f', 'voicetype']);
+      } catch (e) {
+        // Ignore, this is expected to fail if no such path exists
+      }
+      
+      // Try to clean the index more aggressively
+      try {
+        // Get all files currently tracked by git
+        const lsFiles = await this.git.raw(['ls-files']);
+        const trackedFiles = lsFiles.split('\n').filter(f => f.trim().length > 0);
+        
+        // Check if any of these files contain the problematic path
+        const problemFiles = trackedFiles.filter(f => f.includes('voicetype'));
+        
+        if (problemFiles.length > 0) {
+          console.log(`Version0: Found ${problemFiles.length} problematic references to 'voicetype' in git index`);
+          // Remove them individually
+          for (const file of problemFiles) {
+            try {
+              await this.git.raw(['rm', '--cached', '-f', file]);
+              console.log(`Version0: Removed problematic file from index: ${file}`);
+            } catch (e) {
+              // Continue with the next file
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore errors from this operation
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error(`Version0: Error while trying to fix git corruption: ${error.message}`);
+      return false;
+    }
+  }
+
   private async performBackup(isManual: boolean = false): Promise<void> {
-    // Ensure workspace is open
-    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+    const didInitialize = await this.initializeGit(true); // Force re-check/re-init
+
+    if (!this.workspaceRoot) {
       throw new Error("Backup failed: No workspace folder open.");
     }
-    const currentWorkspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-
-    // Check/Initialize Git instance for the current workspace
-    await this.initializeGit();
-
-    // Check if it's a git repo, prompt to initialize if not
-    if (!this.git || !this.workspaceRoot || this.workspaceRoot !== currentWorkspaceRoot) {
-      // Need to re-initialize because it wasn't a repo or workspace changed
-      this.workspaceRoot = currentWorkspaceRoot; // Set workspace root for potential init
+    if (!this.git && didInitialize === false) { // Check if initializeGit explicitly failed or marked not a repo
       const initChoice = await vscode.window.showWarningMessage(
         `Workspace '${path.basename(this.workspaceRoot)}' is not a Git repository. Initialize now?`,
         { modal: true },
         'Initialize Git Repository'
       );
-
       if (initChoice !== 'Initialize Git Repository') {
         throw new Error("Backup cancelled: Workspace is not a Git repository.");
       }
-
-      // User confirmed - Initialize Git
       try {
-        const initGit = simpleGit(this.workspaceRoot); // Create temporary instance for init
-        await initGit.init();
+        const tempGit = simpleGit(this.workspaceRoot); // Use a temporary instance for init
+        await tempGit.init();
         vscode.window.showInformationMessage(`Git repository initialized in ${path.basename(this.workspaceRoot)}.`);
-        // Now properly initialize the BackupManager's git instance
-        await this.initializeGit();
-        if (!this.git) { // Double check if init succeeded
-          throw new Error("Git initialization failed. Please check terminal output.");
+        if (!await this.initializeGit(true)) { // Re-initialize and check again
+             throw new Error("Git initialization seemed to succeed, but BackupManager could not confirm. Please check logs.");
         }
       } catch (initError: any) {
         throw new Error(`Git initialization failed: ${initError.message}`);
       }
     }
+    
+    // At this point, if this.git is still not defined, something is wrong.
+    if (!this.git) {
+        throw new Error("Backup failed: Git is not available for the current workspace. Check for errors during initialization.");
+    }
+    const git = this.git; // Use this constant for operations
 
-    // At this point, this.git should be valid for the workspace root
-    const git = this.git;
-
-    // Get target URL early
+    // Get target URL for the backup remote
     const targetRepoUrl = this.configManager.getTargetBackupRepoUrl();
-
-    // Check for remote 'origin' if just initialized (or always?) - let's check always for safety
-    try {
-      const remotes = await git.getRemotes(true);
-      const originRemote = remotes.find(r => r.name === 'origin');
-
-      if (!originRemote) {
-        // Origin remote does not exist
-        if (!targetRepoUrl) {
-          throw new Error("Backup failed: Target backup repository URL is not configured in settings.");
-        }
-
-        const addRemoteChoice = await vscode.window.showWarningMessage(
-          `Git remote 'origin' not found. Add target URL (${targetRepoUrl}) as origin?`,
-          { modal: true },
-          'Add Remote Origin'
-        );
-
-        if (addRemoteChoice !== 'Add Remote Origin') {
-          throw new Error("Backup cancelled: Remote 'origin' configuration required.");
-        }
-
-        // User confirmed - Add remote
-        try {
-          await git.addRemote('origin', targetRepoUrl);
-          vscode.window.showInformationMessage(`Added remote 'origin' pointing to ${targetRepoUrl}.`);
-        } catch (remoteError: any) {
-          throw new Error(`Failed to add remote 'origin': ${remoteError.message}`);
-        }
-      } else {
-        // Origin remote *does* exist here
-        // Optional: Verify if existing origin matches target URL?
-        if (targetRepoUrl && originRemote.refs.push !== targetRepoUrl) { // No need for originRemote check here, it must exist
-          console.warn(`Version0: Existing remote 'origin' (${originRemote.refs.push}) does not match configured target URL (${targetRepoUrl}). Backup will push to 'origin'.`); // Keep important warning
-          // We could prompt to update origin here, but let's stick to pushing to origin for now.
-        }
-      }
-    } catch (remoteCheckError: any) {
-      throw new Error(`Failed to check Git remotes: ${remoteCheckError.message}`);
+    if (!targetRepoUrl) {
+      throw new Error("Backup failed: Target backup repository URL is not configured in settings. Please set it first (e.g., by creating a repo).");
     }
 
-    // Check authentication status (important for private repos)
+    // Ensure GitHub authentication
     if (!await this.githubService.isAuthenticated()) {
-      // Attempt to authenticate if not already authenticated
       const authenticated = await this.githubService.authenticate();
       if (!authenticated) {
-        throw new Error("Backup failed: GitHub authentication required. Please authenticate via the command palette or status bar.");
+        throw new Error("Backup failed: GitHub authentication required. Please authenticate and try again.");
       }
+    }
+    
+    // Configure the dedicated backup remote
+    try {
+      const remotes = await git.getRemotes(true);
+      let backupRemote = remotes.find(r => r.name === BackupManager.BACKUP_REMOTE_NAME);
+      
+      if (backupRemote && backupRemote.refs.push !== targetRepoUrl) {
+        // Remote exists but points to the wrong URL, update it
+        await git.removeRemote(BackupManager.BACKUP_REMOTE_NAME);
+        backupRemote = undefined; // Treat as if it doesn't exist to re-add
+        console.log(`Version0: Updated '${BackupManager.BACKUP_REMOTE_NAME}' remote to new target URL.`);
+      }
+      
+      if (!backupRemote) {
+        await git.addRemote(BackupManager.BACKUP_REMOTE_NAME, targetRepoUrl);
+        console.log(`Version0: Added remote '${BackupManager.BACKUP_REMOTE_NAME}' pointing to ${targetRepoUrl}.`);
+      }
+    } catch (remoteError: any) {
+      throw new Error(`Failed to configure backup remote '${BackupManager.BACKUP_REMOTE_NAME}': ${remoteError.message}`);
     }
 
     // --- Calculate Next Version Branch Name ---
@@ -207,8 +260,8 @@ export class BackupManager {
       vscode.window.showWarningMessage("Could not determine next version number from existing branches. Starting with v1.0.");
     }
     
-    const timestamp = moment().format('YYYY-MM-DD_HH-mm'); // Use HH-mm for 24h format
-    const branchName = `v${nextVersion}/${timestamp}`;
+    const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss'); // Add seconds for more unique branch names
+    let branchName = `v${nextVersion}/${timestamp}`;
     let commitMessage = `Version0 Backup: v${nextVersion} - ${timestamp}`;
 
     // Prompt for notes only if it's a manual backup
@@ -223,26 +276,107 @@ export class BackupManager {
     }
 
     try {
-      // 1. Create new branch from current HEAD
-      await git.checkoutLocalBranch(branchName);
+      console.log(`Version0: [performBackup] Starting backup. Current this.workspaceRoot: ${this.workspaceRoot}`);
+      const status = await git.status();
+      if (!status.current) {
+          // Attempt to checkout a default branch if possible, or fail.
+          // Common defaults: main, master. Let's try 'main' then 'master'.
+          try {
+              console.log("Version0: [performBackup] No current branch, attempting to checkout 'main'.");
+              await git.checkout('main');
+              vscode.window.showInformationMessage("Version0: Switched to 'main' branch for initial backup.");
+          } catch (e) {
+              try {
+                  console.log("Version0: [performBackup] Checkout 'main' failed, attempting to checkout 'master'.");
+                  await git.checkout('master');
+                  vscode.window.showInformationMessage("Version0: Switched to 'master' branch for initial backup.");
+              } catch (e2) {
+                  console.error("Version0: [performBackup] Failed to checkout a default branch (main/master) for a new repository.", e2);
+                  throw new Error("Backup failed: Git is in a new repository state and could not create a default branch. Please commit manually once or ensure 'main' or 'master' can be created.");
+              }
+          }
+      }
+      
+      console.log(`Version0: [performBackup] About to checkout local branch: ${branchName}. Current branch: ${status.current || 'None'}`);
+      
+      try {
+        // Try to create the branch
+        await git.checkoutLocalBranch(branchName);
+        console.log(`Version0: [performBackup] Successfully checked out new local branch: ${branchName}`);
+      } catch (branchError: any) {
+        // If branch already exists, try to use it
+        if (branchError.message.includes('already exists')) {
+          console.log(`Version0: [performBackup] Branch ${branchName} already exists, attempting to switch to it`);
+          try {
+            // Try to switch to the existing branch
+            await git.checkout(branchName);
+            console.log(`Version0: [performBackup] Successfully switched to existing branch: ${branchName}`);
+          } catch (checkoutError: any) {
+            // If we can't switch to it either, try a more unique name by adding a suffix
+            const uniqueBranchName = `${branchName}-${Math.floor(Math.random() * 1000)}`;
+            console.log(`Version0: [performBackup] Creating alternative branch name: ${uniqueBranchName}`);
+            await git.checkoutLocalBranch(uniqueBranchName);
+            console.log(`Version0: [performBackup] Successfully created alternative branch: ${uniqueBranchName}`);
+            // Update the branch name for the rest of the process
+            branchName = uniqueBranchName;
+          }
+        } else {
+          // Some other error occurred
+          console.error(`Version0: [performBackup] Error creating branch: ${branchError.message}`);
+          throw branchError;
+        }
+      }
+      
+      // Validate workspaceRoot one last time and log git context
+      if (!this.workspaceRoot || !await fs.stat(this.workspaceRoot).then(s => s.isDirectory()).catch(() => false)) {
+          console.error(`Version0: [performBackup] Workspace path is invalid before git add: ${this.workspaceRoot}`);
+          throw new Error(`Backup failed: Workspace path is invalid or inaccessible: ${this.workspaceRoot}`);
+      }
+      const currentGitDir = await git.revparse('--git-dir').catch((err) => `unknown git-dir (${err.message})`);
+      const currentTopLevel = await git.revparse('--show-toplevel').catch((err) => `unknown top-level (${err.message})`);
+      console.log(`Version0: [performBackup] Pre-add context. WorkspaceRoot: ${this.workspaceRoot}, GitDir: ${currentGitDir}, TopLevel: ${currentTopLevel}`);
 
-      // 2. Add all changes
-      await git.add('.');
+      try {
+        // Check if there's any corruption in git index related to 'voicetype'
+        console.log(`Version0: [performBackup] Checking for problematic references before adding files`);
+        
+        // Attempt first level of cleanup
+        await this.tryFixGitCorruption();
 
-      // 3. Commit changes
-      const commitResult = await git.commit(commitMessage);
-      if (commitResult.commit.length === 0) {
-        // Optional: delete the branch locally if nothing was committed?
-        // await git.checkout('-'); // switch back? Be careful with state
-        // await git.deleteLocalBranch(branchName, true);
-        // For now, let's proceed and push the empty commit branch as a timestamp marker
+        // Get the status to determine what files to add
+        const statusSummary = await git.status();
+        
+        if (statusSummary.files.length === 0) {
+          // Nothing to add, proceed with empty commit
+          console.log(`Version0: [performBackup] No modified files found, proceeding with empty commit`);
+        } else {
+          // Add files individually instead of using '.'
+          const filesToAdd = statusSummary.files
+            .map(file => file.path)
+            .filter(path => !path.includes('voicetype')); // Exclude any paths with 'voicetype'
+            
+          console.log(`Version0: [performBackup] Adding ${filesToAdd.length} files individually`);
+          
+          if (filesToAdd.length > 0) {
+            // Add files in batches to avoid command line length issues
+            const batchSize = 50;
+            for (let i = 0; i < filesToAdd.length; i += batchSize) {
+              const batch = filesToAdd.slice(i, i + batchSize);
+              await git.add(batch);
+            }
+          }
+        }
+      } catch (addError: any) {
+        console.error(`Version0: [performBackup] Error during file add operation: ${addError.message}`);
+        // Attempt to continue with empty commit
       }
 
-      // 4. Push the new branch to origin
-      await git.push('origin', branchName, { '--set-upstream': null }); // Use object for options
+      const commitResult = await git.commit(commitMessage, { '--allow-empty': null }); 
+      
+      // Push to the dedicated backup remote
+      await git.push(BackupManager.BACKUP_REMOTE_NAME, branchName, { '--set-upstream': null });
 
-      // 6. Fetch origin to update local refs and potentially help VS Code UI recognize the push
-      await git.fetch('origin');
+      await git.fetch(BackupManager.BACKUP_REMOTE_NAME); // Fetch from the specific remote
 
       if (this.configManager.getEnableNotifications()) {
         vscode.window.showInformationMessage(`Version0: Backup successful. Branch '${branchName}' pushed.`);
@@ -262,74 +396,69 @@ export class BackupManager {
 
   // --- Restore Functionality --- (To be implemented fully)
   public async restoreFromBackup(branchName: string): Promise<void> {
-    await this.initializeGit();
-    if (!this.git || !this.workspaceRoot) {
-      throw new Error("Restore failed: Not inside a Git repository or no workspace open.");
+    if (!await this.initializeGit(true) || !this.git || !this.workspaceRoot) {
+      throw new Error("Restore failed: Git is not available or workspace not found.");
     }
-
-    const targetRepoUrl = this.configManager.getTargetBackupRepoUrl(); // Needed for fetch?
-    if (!targetRepoUrl) {
-      throw new Error("Restore failed: Target backup repository URL is not configured.");
-    }
-
-    // Check auth for fetch
-    if (!await this.githubService.isAuthenticated()) {
-      const authenticated = await this.githubService.authenticate();
-      if (!authenticated) {
-        throw new Error("Restore failed: GitHub authentication required to fetch branches.");
-      }
-    }
-
-    // Branch name likely includes prefix, e.g., "backup/YYYY..."
-    const fullBranchName = branchName.startsWith('refs/heads/') ? branchName : `refs/heads/${branchName}`;
-    const shortBranchName = fullBranchName.replace('refs/heads/', '');
-
-    const confirmation = await vscode.window.showWarningMessage(
-      `Restore workspace to backup branch '${shortBranchName}'? This will overwrite local changes.`,
-      { modal: true },
-      'Restore'
-    );
-
-    if (confirmation !== 'Restore') {
-      vscode.window.showInformationMessage('Restore operation cancelled.');
-      return;
-    }
-
-    console.log(`Version0: Starting restore from branch ${shortBranchName}`);
     const git = this.git;
-    const gitignorePath = path.join(this.workspaceRoot, '.gitignore');
-    let originalGitignoreContent: string | undefined;
+    const targetRepoUrl = this.configManager.getTargetBackupRepoUrl();
+
+    if (!targetRepoUrl) {
+        throw new Error("Restore failed: Target backup repository URL is not configured.");
+    }
+    
+    // Ensure backup remote is configured
+    try {
+        const remotes = await git.getRemotes(true);
+        let backupRemote = remotes.find(r => r.name === BackupManager.BACKUP_REMOTE_NAME);
+        if (backupRemote && backupRemote.refs.fetch !== targetRepoUrl) { // Check fetch URL for restore
+            await git.removeRemote(BackupManager.BACKUP_REMOTE_NAME);
+            backupRemote = undefined;
+        }
+        if (!backupRemote) {
+            await git.addRemote(BackupManager.BACKUP_REMOTE_NAME, targetRepoUrl);
+        }
+        // Fetch the specific branch from the backup remote
+        await git.fetch(BackupManager.BACKUP_REMOTE_NAME, branchName);
+    } catch (e: any) {
+        throw new Error(`Failed to prepare remote for restore: ${e.message}`);
+    }
+
+
+    // Check if the branch exists locally (it might after fetch if named the same, but we want remote one)
+    // The format from fetch would be 'refs/remotes/version0_backup_target/vX.Y/timestamp'
+    const remoteBranchRef = `refs/remotes/${BackupManager.BACKUP_REMOTE_NAME}/${branchName}`;
 
     try {
-      // 1. Save current .gitignore
-      try {
-        originalGitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
-      } catch (readError: any) {
-        if (readError.code === 'ENOENT') {
-          console.log("Version0: No .gitignore file found in workspace root. Nothing to preserve.");
-        } else {
-          throw new Error(`Failed to read existing .gitignore: ${readError.message}`);
+      // stash local changes
+      const status = await git.status();
+      let stashed = false;
+      let stashMsg: string | undefined = undefined; // Declare stashMsg here
+
+      if (!status.isClean()) {
+        stashMsg = `Version0_stash_before_restore_${moment().format('YYYYMMDDHHmmss')}`; // Assign here
+        await git.stash(['push', '-u', '-m', stashMsg]); 
+        stashed = true;
+        vscode.window.showInformationMessage(`Local changes stashed as: ${stashMsg}`);
+      }
+
+      // Checkout the fetched remote branch into a local branch (can be same name, or a temporary one)
+      // Force checkout to overwrite local changes
+      await git.checkout(remoteBranchRef, ['-B', branchName, '-f']); // Create/reset local branch 'branchName' to the fetched remote ref, force
+
+      if (stashed) {
+        // Try to pop the stash. If conflicts, user needs to resolve.
+        try {
+          await git.stash(['pop']);
+          vscode.window.showInformationMessage(`Previously stashed changes (if any) have been reapplied.`);
+        } catch (popError: any) {
+          vscode.window.showWarningMessage(`Could not automatically reapply stashed changes due to conflicts. Please resolve them manually. Stash was named: '${stashMsg || 'recently created stash'}'.`);
+          // User needs to 'git stash pop' or 'git stash apply' and resolve conflicts
         }
       }
-
-      // 2. Fetch the specific branch from origin
-      await git.fetch('origin', shortBranchName);
-
-      // 3. Checkout the branch
-      await git.checkout(shortBranchName);
-
-      // 4. Restore .gitignore if it was saved
-      if (originalGitignoreContent !== undefined) {
-        await fs.writeFile(gitignorePath, originalGitignoreContent, 'utf-8');
-      }
-
-      vscode.window.showInformationMessage(`Version0: Successfully restored workspace to backup branch '${shortBranchName}'.`);
-
+      
+      vscode.window.showInformationMessage(`Successfully restored workspace to backup branch '${branchName}'.`);
     } catch (error: any) {
-      console.error("Version0: Restore operation failed:", error);
-      vscode.window.showErrorMessage(`Version0: Restore failed: ${error.message}`);
-      // Attempt to switch back? Risky.
-      throw new Error(`Restore operation failed: ${error.message}`);
+      throw new Error(`Failed to restore from branch '${branchName}': ${error.message}`);
     }
   }
 
@@ -337,87 +466,102 @@ export class BackupManager {
 
   // --- Push Current State Functionality ---
   public async pushCurrentState(): Promise<{ branchName: string; pullRequestUrl?: string } | void> {
-    await this.initializeGit();
-    if (!this.git || !this.workspaceRoot) {
-        throw new Error("Push failed: Not inside a Git repository or no workspace open.");
+    if (!await this.initializeGit(true) || !this.git || !this.workspaceRoot) {
+      throw new Error("Push operation failed: Git is not available or workspace not found.");
     }
-
-    // Check auth status (needed for push)
-    if (!await this.githubService.isAuthenticated()) {
-        const authenticated = await this.githubService.authenticate();
-        if (!authenticated) {
-            throw new Error("Push failed: GitHub authentication required.");
-        }
-    }
-
     const git = this.git;
-    const commitMessage = `Version0: Push current state - ${moment().format('YYYY-MM-DD HH:mm:ss')}`;
+    const targetRepoUrl = this.configManager.getTargetBackupRepoUrl();
+
+    if (!targetRepoUrl) {
+      vscode.window.showErrorMessage("Push failed: Target backup repository URL is not configured. Please create or set a target repository in Version0 settings.");
+      return;
+    }
+
+    if (!await this.githubService.isAuthenticated()) {
+      const authenticated = await this.githubService.authenticate();
+      if (!authenticated) {
+        vscode.window.showErrorMessage("Push failed: GitHub authentication required.");
+        return;
+      }
+    }
+    
+    // Configure the dedicated backup remote (same as in performBackup)
+    try {
+      const remotes = await git.getRemotes(true);
+      let backupRemote = remotes.find(r => r.name === BackupManager.BACKUP_REMOTE_NAME);
+      if (backupRemote && backupRemote.refs.push !== targetRepoUrl) {
+        await git.removeRemote(BackupManager.BACKUP_REMOTE_NAME);
+        backupRemote = undefined;
+      }
+      if (!backupRemote) {
+        await git.addRemote(BackupManager.BACKUP_REMOTE_NAME, targetRepoUrl);
+      }
+    } catch (remoteError: any) {
+      throw new Error(`Failed to configure backup remote '${BackupManager.BACKUP_REMOTE_NAME}' for push: ${remoteError.message}`);
+    }
 
     try {
-        // 1. Get current branch
-        const branchSummary = await git.branchLocal();
-        const currentBranch = branchSummary.current;
-        if (!currentBranch) {
-            throw new Error("Could not determine the current branch.");
-        }
+      const status = await git.status();
+      if (!status.current) {
+        throw new Error("Could not determine the current branch. Please ensure you are on a branch.");
+      }
+      const currentBranch = status.current;
 
-        // 2. Add all changes (respects .gitignore)
-        await git.add('.');
+      // Optional: Add and commit any uncommitted changes before pushing?
+      // For "Push Current Branch", we assume the user wants to push the branch as-is,
+      // or they should commit manually first. Let's not auto-commit here.
+      // if (!status.isClean()) {
+      //   const commitChoice = await vscode.window.showInformationMessage(
+      //     "You have uncommitted changes. Commit them before pushing?",
+      //     { modal: true }, "Commit and Push", "Push without Committing"
+      //   );
+      //   if (commitChoice === "Commit and Push") {
+      //     await git.add('.');
+      //     await git.commit(`Version0: Pushing current state of branch ${currentBranch}`);
+      //   } else if (commitChoice !== "Push without Committing") {
+      //     return; // Cancelled
+      //   }
+      // }
 
-        // 3. Commit changes
-        try {
-            const commitResult = await git.commit(commitMessage);
-            if (commitResult.commit) {
-            } else {
-                // If no changes, we can still try to push the existing branch state
-            }
-        } catch (commitError: any) {
-            // Handle potential "nothing to commit" error gracefully if needed,
-            // but usually simple-git doesn't throw for that, it returns an empty commit.
-            // Rethrow other commit errors.
-            console.error("Commit failed:", commitError);
-            throw new Error(`Commit failed: ${commitError.message}`);
-        }
+      await git.push(BackupManager.BACKUP_REMOTE_NAME, currentBranch, { '--set-upstream': null });
+      
+      vscode.window.showInformationMessage(`Successfully pushed branch '${currentBranch}' to backup target.`);
 
-        // 4. Push the current branch to origin
-        await git.push('origin', currentBranch);
-
-        if (this.configManager.getEnableNotifications()) {
-            // We show a more detailed message from the Webview provider now
-        }
-
-        // Construct PR URL if needed
-        let pullRequestUrl: string | undefined = undefined;
-        const targetRepoUrl = this.configManager.getTargetBackupRepoUrl(); // Get target repo URL again
-        
-        if (targetRepoUrl && currentBranch !== 'main' && currentBranch !== 'master') {
-            // Basic parsing - assumes HTTPS URL format for simplicity
-            const match = targetRepoUrl.match(/github\.com[\/|:]([\w-]+)\/([\w-]+?)(\.git)?$/i);
-            if (match && match[1] && match[2]) {
-                const owner = match[1];
-                const repo = match[2];
-                // Assuming base is 'main'. Could be made configurable.
-                pullRequestUrl = `https://github.com/${owner}/${repo}/compare/main...${encodeURIComponent(currentBranch)}?expand=1`;
-            } else {
-                console.warn(`Version0: Could not parse owner/repo from target URL '${targetRepoUrl}' to generate PR link.`);
-            }
-        }
-
-        // Return result object
-        return {
-            branchName: currentBranch,
-            pullRequestUrl: pullRequestUrl
-        };
+      // Construct a potential PR URL - this is a best guess
+      const repoInfo = this.parseRepoUrlForPR(targetRepoUrl); // Need to implement or reuse this
+      let pullRequestUrl: string | undefined = undefined;
+      if (repoInfo) {
+        pullRequestUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${currentBranch}`;
+      }
+      
+      return { branchName: currentBranch, pullRequestUrl };
 
     } catch (error: any) {
-        console.error("Version0: Push current state operation failed:", error);
-        if (this.configManager.getEnableNotifications()) {
-            vscode.window.showErrorMessage(`Version0: Push failed: ${error.message}`);
-        }
-        throw new Error(`Push operation failed: ${error.message}`); // Re-throw for progress handler
+      console.error("Version0: Push current state operation failed:", error);
+      throw new Error(`Push operation failed: ${error.message}`);
     }
   }
-  // --- End Push Current State ---
+  
+  // Helper to parse owner/repo for PR URL (can be simplified if GithubService has a public one)
+  private parseRepoUrlForPR(url: string): { owner: string; repo: string } | null {
+    try {
+      if (url.startsWith('https:')) {
+        const urlObj = new URL(url);
+        if (urlObj.hostname !== 'github.com') return null;
+        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+        if (pathParts.length < 2) return null;
+        const repoName = pathParts[1].endsWith('.git') ? pathParts[1].slice(0, -4) : pathParts[1];
+        return { owner: pathParts[0], repo: repoName };
+      } else if (url.startsWith('git@')) {
+        // git@github.com:owner/repo.git
+        const match = url.match(/git@github\.com:([^/]+)\/([^.]+)(\.git)?/);
+        if (match && match[1] && match[2]) {
+            return { owner: match[1], repo: match[2] };
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return null;
+  }
 
   // Remove old methods
   // public async addRepository(url: string): Promise<void> { ... }
