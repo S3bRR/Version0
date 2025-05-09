@@ -2,7 +2,7 @@
   "name": "version0",
   "displayName": "Version0",
   "description": "Automatically create backup branches on GitHub repositories",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "v0Design",
   "icon": "Version0_image.png",
   "engines": {
