@@ -198,4 +198,53 @@ export class GithubService implements vscode.Disposable {
       return [];
     }
   }
+
+  public async createPrivateRepository(name: string): Promise<{url?: string, error?: string}> {
+    if (!this.octokit) {
+      await this.authenticate(); // Try to authenticate if not already
+      if (!this.octokit) {
+        return { error: 'GitHub authentication required. Please authenticate first.' };
+      }
+    }
+    try {
+      const response = await this.octokit.repos.createForAuthenticatedUser({ 
+        name, 
+        private: true,
+        auto_init: true // Initialize with a README
+      });
+      return { url: response.data.html_url };
+    } catch (error: any) {
+      console.error(`[GithubService] Error creating private repository '${name}':`, error);
+      return { error: `Failed to create repository: ${error.message}` };
+    }
+  }
+
+  public async checkRepositoryAccess(repoUrl: string): Promise<{status: 'success' | 'error', message: string}> {
+    if (!this.octokit) {
+      await this.authenticate(); // Try to authenticate if not already
+      if (!this.octokit) {
+         return { status: 'error', message: 'GitHub authentication required. Please authenticate first.' };
+      }
+    }
+
+    const repoInfo = this.parseRepoUrl(repoUrl);
+    if (!repoInfo) {
+      return { status: 'error', message: `Invalid Target Repo URL format: ${repoUrl}` };
+    }
+
+    const { owner, repo } = repoInfo;
+
+    try {
+      await this.octokit.repos.get({ owner, repo });
+      return { status: 'success', message: 'Repository accessible.' };
+    } catch (error: any) {
+      console.error(`[GithubService] Error accessing repository ${owner}/${repo}:`, error);
+      if (error.status === 404) {
+        return { status: 'error', message: `Repository not found: ${owner}/${repo}` };
+      } else if (error.status === 403 || error.status === 401) {
+        return { status: 'error', message: `Access denied to repository: ${owner}/${repo}. Check token permissions.` };
+      }
+      return { status: 'error', message: `Failed to access repository ${owner}/${repo}: ${error.message}` };
+    }
+  }
 }

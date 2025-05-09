@@ -67,6 +67,78 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						vscode.window.showErrorMessage('Invalid repository URL format.');
 					}
 					return;
+				case 'createRepo':
+					const repoNameToCreate = message.name;
+					if (!repoNameToCreate) {
+						vscode.window.showErrorMessage('Repository name cannot be empty.');
+						this._view?.webview.postMessage({ command: 'updateStatus', text: 'Repository creation failed: Name empty.' });
+						return;
+					}
+					vscode.window.withProgress({
+						location: vscode.ProgressLocation.Notification,
+						title: `Version0: Creating GitHub repository '${repoNameToCreate}'...`,
+						cancellable: false
+					}, async (progress) => {
+						progress.report({ increment: 0, message: "Initiating creation..." });
+						const result = await this._githubService.createPrivateRepository(repoNameToCreate);
+						if (result.url) {
+							progress.report({ increment: 100, message: "Repository created!" });
+							await this._configManager.setTargetBackupRepoUrl(result.url);
+							vscode.window.showInformationMessage(`Successfully created private repository: ${result.url}`);
+							this._view?.webview.postMessage({ command: 'repoCreated', newUrl: result.url, message: `Repository ${repoNameToCreate} created. Target URL updated.` });
+							this.refreshBranches(); // Refresh branches as the target repo has changed
+						} else {
+							vscode.window.showErrorMessage(`Failed to create repository: ${result.error}`);
+							this._view?.webview.postMessage({ command: 'updateStatus', text: `Repo creation failed: ${result.error}` });
+						}
+					});
+					return;
+				case 'syncRepo':
+					vscode.window.withProgress({
+						location: vscode.ProgressLocation.Notification,
+						title: "Version0: Syncing repository status...",
+						cancellable: false
+					}, async (progress) => {
+						progress.report({ increment: 0, message: "Checking authentication..." });
+						const isAuthenticated = await this._githubService.isAuthenticated();
+						if (!isAuthenticated) {
+							vscode.window.showErrorMessage('GitHub authentication required. Please authenticate first.');
+							this._view?.webview.postMessage({ command: 'updateStatus', text: 'Sync failed: GitHub authentication required.' });
+							// Attempt to trigger authentication
+							try {
+								const authSuccess = await this._githubService.authenticate();
+								if (authSuccess) {
+									this._view?.webview.postMessage({ command: 'updateStatus', text: 'Authenticated. Please try Sync again.' });
+								} else {
+									this._view?.webview.postMessage({ command: 'updateStatus', text: 'Authentication failed. Please try Sync again after authenticating.' });
+								}
+							} catch (authError) {
+								this._view?.webview.postMessage({ command: 'updateStatus', text: 'Authentication process failed.' });
+							}
+							return;
+						}
+
+						progress.report({ increment: 30, message: "Checking target repository URL..." });
+						const currentTargetRepoUrl = this._configManager.getTargetBackupRepoUrl();
+						if (!currentTargetRepoUrl) {
+							vscode.window.showWarningMessage('Target backup repository URL is not set. Please set it first.');
+							this._view?.webview.postMessage({ command: 'updateStatus', text: 'Sync failed: Target repository URL is not set.' });
+							return;
+						}
+
+						progress.report({ increment: 60, message: "Checking repository access..." });
+						const accessResult = await this._githubService.checkRepositoryAccess(currentTargetRepoUrl);
+						if (accessResult.status === 'success') {
+							progress.report({ increment: 100, message: "Sync successful!" });
+							vscode.window.showInformationMessage(`Sync successful: ${accessResult.message}`);
+							this._view?.webview.postMessage({ command: 'updateStatus', text: `Sync: ${accessResult.message}` });
+							this.refreshBranches(); // Good to refresh branches on successful sync
+						} else {
+							vscode.window.showErrorMessage(`Sync failed: ${accessResult.message}`);
+							this._view?.webview.postMessage({ command: 'updateStatus', text: `Sync failed: ${accessResult.message}` });
+						}
+					});
+					return;
 				case 'backupNow':
 					vscode.window.withProgress({
 						location: vscode.ProgressLocation.Notification,
@@ -213,6 +285,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 	// Helper to fetch and send branches
 	public async refreshBranches() {
 		if (!this._view) return; // Exit if view is not ready
+		console.log('[WebviewProvider] refreshBranches called.');
 
 		this._view.webview.postMessage({ command: 'updateStatus', text: 'Fetching branches...' });
 		try {
@@ -252,177 +325,226 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview): string {
-		// Get URI to script on disk, then convert it to a URI webviews can load
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.js'));
+		const styleResetUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'reset.css'));
+		const styleVSCodeUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'vscode.css'));
+		const styleMainUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.css'));
 
-		// Get URI for toolkit
-		const toolkitUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode/webview-ui-toolkit', 'dist', 'toolkit.js')); // Assuming installed
-		// OR Use CDN - Simpler for now if toolkit not bundled
-		// const toolkitUri = "https://unpkg.com/@vscode/webview-ui-toolkit@latest"; // Requires network
-
-		// Use a nonce to only allow specific scripts to be run
 		const nonce = getNonce();
+		const currentFrequency = this._configManager.getBackupInterval();
+		const currentTargetRepoUrl = this._configManager.getTargetBackupRepoUrl() || '';
 
 		return `<!DOCTYPE html>
 			<html lang="en">
 			<head>
 				<meta charset="UTF-8">
-				<!-- Use a content security policy to only allow loading specific resources -->
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https:; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
+				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} data:; script-src 'nonce-${nonce}';">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
 				
-				<!-- If installed via npm:
-				<script type="module" nonce="${nonce}" src="${toolkitUri}"></script> 
-				-->
-				 <!-- Using CDN requires adjusting CSP script-src if needed -->
-				 <script type="module" nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/@vscode/webview-ui-toolkit@1/dist/toolkit.min.js"></script>
+				<link href="${styleResetUri}" rel="stylesheet">
+				<link href="${styleVSCodeUri}" rel="stylesheet">
+				<link href="${styleMainUri}" rel="stylesheet">
 
-				<title>Version0 Backup</title>
-				<style>
-					/* Basic Reset & Body */
-					body {
-						font-family: var(--vscode-font-family);
-						color: var(--vscode-foreground);
-						background-color: var(--vscode-sideBar-background);
-						padding: 10px 15px;
-						box-sizing: border-box;
-					}
-					h3, h4 {
-						color: var(--vscode-sideBar-titleForeground);
-						margin-top: 10px;
-						margin-bottom: 8px;
-					}
-					/* Layout */
-					.container {
-						display: flex;
-						flex-direction: column;
-						gap: 15px; /* Space between sections */
-					}
-					.setting-row {
-						display: flex;
-						align-items: center;
-						gap: 8px; /* Space within a row */
-						margin-bottom: 8px;
-					}
-					.setting-row label {
-						white-space: nowrap;
-						font-size: var(--vscode-font-size);
-					}
-					 /* Make text field take available space */
-					vscode-text-field {
-						flex-grow: 1;
-					}
-					 /* Buttons */
-					.button-group {
-						display: flex;
-						gap: 8px;
-						margin-top: 5px;
-					}
-					vscode-button {
-						/* Default button styling is usually fine */
-						min-width: 60px; /* Prevent tiny save buttons */
-					}
-					 vscode-button[appearance="secondary"] {
-						 /* Style secondary buttons if needed */
-					 }
-					#auth-button-container {
-						 margin-top: 10px;
-					 }
-					/* Branch List */
-					#branch-list-container {
-						margin-top: 10px;
-					}
-					.section-title {
-						display: flex;
-						justify-content: space-between;
-						align-items: center;
-						margin-bottom: 5px;
-						border-bottom: 1px solid var(--vscode-editorGroupHeader-tabsBorder);
-						padding-bottom: 4px;
-					}
-					.section-title h4 {
-						 margin: 0;
-					 }
-					#refresh-branches {
-						/* Style refresh as an icon button if possible or smaller */
-						min-width: auto;
-						padding: 2px 6px;
-					}
-					#branch-list {
-						list-style: none;
-						padding: 5px;
-						margin: 0;
-						max-height: 200px;
-						overflow-y: auto;
-						border: 1px solid var(--vscode-input-border, var(--vscode-contrastBorder));
-						border-radius: var(--input-corner-radius, 3px); 
-						background: var(--vscode-input-background);
-					}
-					#branch-list li {
-						padding: 6px 8px;
-						border-bottom: 1px solid var(--vscode-editorGroupHeader-tabsBorder);
-						cursor: pointer;
-						font-size: var(--vscode-font-size);
-						color: var(--vscode-foreground);
-						overflow: hidden;
-						text-overflow: ellipsis;
-						white-space: nowrap;
-					}
-					#branch-list li:hover {
-						background-color: var(--vscode-list-hoverBackground);
-						color: var(--vscode-list-hoverForeground);
-					}
-					#branch-list li:last-child {
-						border-bottom: none;
-					}
-					/* Status Area */
-					#status {
-						margin-top: 15px;
-						font-style: italic;
-						font-size: calc(var(--vscode-font-size) * 0.9);
-						color: var(--vscode-descriptionForeground);
-					}
-				</style>
+				<title>Version0 Controls</title>
 			</head>
 			<body>
-				<div class="container">
-					<div class="setting-row">
+				<h2>VERSION0</h2>
+				
+				<div class="form-container">
+					<div class="inline-form-group">
 						<label for="frequency">Frequency (min):</label>
-						<vscode-text-field type="number" id="frequency" value="" min="1"></vscode-text-field>
-						<vscode-button appearance="secondary" id="save-frequency">Save</vscode-button>
+						<input type="number" id="frequency" value="${currentFrequency}" min="1">
+						<button id="saveFrequencyBtn">Save</button>
 					</div>
 
-					<div class="setting-row">
-						<label for="target-repo">Target Repo URL:</label>
-						<vscode-text-field id="target-repo" value="" placeholder="e.g., https://github.com/owner/repo.git"></vscode-text-field>
-						<vscode-button appearance="secondary" id="save-target-repo">Save</vscode-button>
+					<div class="inline-form-group">
+						<label for="targetRepo">Target Repo URL:</label>
+						<input type="text" id="targetRepo" value="${currentTargetRepoUrl}" placeholder="e.g., https://github.com/user/repo.git">
+						<button id="saveTargetRepoBtn">Save</button>
+					</div>
+					
+					<div class="button-group">
+						<button id="createRepoBtn">Create Private Repo</button>
+						<button id="syncRepoBtn">Sync</button>
 					</div>
 
 					<div class="button-group">
-						<vscode-button id="backup-now">Backup Now</vscode-button>
-						<vscode-button id="push-current-branch">Push Current Branch</vscode-button>
+						<button id="backupNowBtn">Backup Now</button>
+						<button id="pushCurrentBranchBtn">Push Current Branch</button>
 					</div>
 
-					<div id="branch-list-container">
-						<div class="section-title">
-							<h4>Backup Branches</h4>
-							<vscode-button appearance="icon" id="refresh-branches" title="Refresh Branch List">
-								<span class="codicon codicon-refresh"></span> <!-- Requires CSP adjustment for codicon font -->
-							</vscode-button>
-						</div>
-						<ul id="branch-list">
-							<li>Loading branches...</li>
-						</ul>
-					</div>
-
-					<div id="auth-button-container" style="display: none;">
-						<vscode-button appearance="primary" id="auth-button">Authenticate with GitHub</vscode-button>
-					</div>
-
-					<div id="status">Loading...</div>
+					<h3>Backup Branches</h3>
+					<div id="branchesContainer">Loading branches...</div>
+					
+					<div id="status">Ready</div>
 				</div>
 
-				<script nonce="${nonce}" src="${scriptUri}"></script>
+				<!-- Modal for creating repository -->
+				<div id="createRepoModal" class="modal" style="display:none;">
+				  <div class="modal-content">
+				    <h4>Create New Private Repository</h4>
+				    <label for="newRepoNameInput">Repository Name:</label>
+				    <input type="text" id="newRepoNameInput" placeholder="my-new-backup-repo">
+				    <div class="modal-buttons">
+				      <button id="confirmCreateRepoBtn">Create</button>
+				      <button id="cancelCreateRepoBtn">Cancel</button>
+				    </div>
+				  </div>
+				</div>
+
+				<script nonce="${nonce}">
+					const vscode = acquireVsCodeApi();
+					const frequencyInput = document.getElementById('frequency');
+					const saveFrequencyBtn = document.getElementById('saveFrequencyBtn');
+					const targetRepoInput = document.getElementById('targetRepo');
+					const saveTargetRepoBtn = document.getElementById('saveTargetRepoBtn');
+					const backupNowBtn = document.getElementById('backupNowBtn');
+					const pushCurrentBranchBtn = document.getElementById('pushCurrentBranchBtn');
+					
+					const createRepoBtn = document.getElementById('createRepoBtn');
+					const syncRepoBtn = document.getElementById('syncRepoBtn');
+					const branchesContainer = document.getElementById('branchesContainer');
+					const statusDiv = document.getElementById('status');
+
+					// Modal elements
+					const createRepoModal = document.getElementById('createRepoModal');
+					const newRepoNameInput = document.getElementById('newRepoNameInput');
+					const confirmCreateRepoBtn = document.getElementById('confirmCreateRepoBtn');
+					const cancelCreateRepoBtn = document.getElementById('cancelCreateRepoBtn');
+					
+					let state = vscode.getState() || {
+						frequency: ${currentFrequency},
+						targetRepoUrl: "${currentTargetRepoUrl}"
+					};
+					// Initialize inputs from state if available
+					frequencyInput.value = state.frequency;
+					targetRepoInput.value = state.targetRepoUrl;
+
+					saveFrequencyBtn.addEventListener('click', () => {
+						vscode.postMessage({ command: 'saveFrequency', text: frequencyInput.value });
+					});
+
+					saveTargetRepoBtn.addEventListener('click', () => {
+						vscode.postMessage({ command: 'saveTargetRepo', text: targetRepoInput.value });
+					});
+
+					// Show Create Repo Modal
+					createRepoBtn.addEventListener('click', () => {
+						newRepoNameInput.value = ''; // Clear previous input
+						createRepoModal.style.display = 'flex'; // Show modal
+						newRepoNameInput.focus();
+					});
+
+					// Confirm Create Repo from Modal
+					confirmCreateRepoBtn.addEventListener('click', () => {
+						const repoName = newRepoNameInput.value;
+						if (repoName && repoName.trim() !== '') {
+							vscode.postMessage({ command: 'createRepo', name: repoName.trim() });
+							statusDiv.textContent = 'Creating repository...';
+							createRepoModal.style.display = 'none'; // Hide modal
+						} else {
+							statusDiv.textContent = 'Repository name cannot be empty.';
+							// Optionally, you could add an error display within the modal
+						}
+					});
+
+					// Cancel Create Repo from Modal
+					cancelCreateRepoBtn.addEventListener('click', () => {
+						createRepoModal.style.display = 'none'; // Hide modal
+						statusDiv.textContent = 'Create repository cancelled.';
+					});
+
+					syncRepoBtn.addEventListener('click', () => {
+						vscode.postMessage({ command: 'syncRepo' });
+						statusDiv.textContent = 'Syncing...';
+					});
+
+					backupNowBtn.addEventListener('click', () => {
+						vscode.postMessage({ command: 'backupNow' });
+						statusDiv.textContent = 'Starting manual backup...';
+					});
+					
+					pushCurrentBranchBtn.addEventListener('click', () => {
+						vscode.postMessage({ command: 'pushCurrentBranch' });
+						statusDiv.textContent = 'Pushing current branch...';
+					});
+
+					window.addEventListener('message', event => {
+						const message = event.data;
+						console.log('Received message:', message);
+						
+						switch (message.command) {
+							case 'frequencySaved':
+								frequencyInput.value = message.value;
+								statusDiv.textContent = 'Frequency saved.';
+								state.frequency = message.value;
+								vscode.setState(state);
+								break;
+							case 'targetRepoSaved':
+								targetRepoInput.value = message.value;
+								statusDiv.textContent = 'Target repository saved.';
+								state.targetRepoUrl = message.value;
+								vscode.setState(state);
+								break;
+							case 'repoCreated':
+								targetRepoInput.value = message.newUrl;
+								statusDiv.textContent = message.message || 'Repository created and target URL updated.';
+								state.targetRepoUrl = message.newUrl;
+								vscode.setState(state);
+								break;
+							case 'updateBranches':
+								branchesContainer.innerHTML = '';
+								if (message.branches && message.branches.length > 0) {
+									const ul = document.createElement('ul');
+									message.branches.forEach(branch => {
+										const li = document.createElement('li');
+										li.textContent = branch + ' ';
+										
+										const restoreButton = document.createElement('button');
+										restoreButton.textContent = 'Restore';
+										restoreButton.className = 'restore-button';
+										restoreButton.onclick = () => {
+											statusDiv.textContent = 'Requesting restore for ' + branch + '...';
+											vscode.postMessage({ command: 'requestRestore', branchName: branch });
+										};
+										li.appendChild(restoreButton);
+										ul.appendChild(li);
+									});
+									branchesContainer.appendChild(ul);
+									statusDiv.textContent = 'Branches loaded.';
+								} else {
+									branchesContainer.textContent = 'No backup branches found or target repo not set/accessible.';
+								}
+								break;
+							case 'updateStatus':
+								statusDiv.textContent = message.text;
+								break;
+							case 'updateState':
+								if(message.frequency) {
+									frequencyInput.value = message.frequency;
+									state.frequency = message.frequency;
+								}
+								if(message.targetRepoUrl) {
+									targetRepoInput.value = message.targetRepoUrl;
+									state.targetRepoUrl = message.targetRepoUrl;
+								}
+								vscode.setState(state);
+								
+								if (targetRepoInput.value) {
+									vscode.postMessage({ command: 'getBranches' });
+								} else {
+									branchesContainer.textContent = 'Set target repository URL to see branches.';
+								}
+								break;
+						}
+					});
+
+					if (targetRepoInput.value) {
+						vscode.postMessage({ command: 'getBranches' });
+					} else {
+						statusDiv.textContent = 'Ready. Configure target repository.';
+						branchesContainer.textContent = 'Set target repository URL to see branches.';
+					}
+				</script>
 			</body>
 			</html>`;
 	}

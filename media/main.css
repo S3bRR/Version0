@@ -1,0 +1,122 @@
+/* Custom styling for Version0 extension */
+
+h2 {
+    margin-top: 5px;
+    margin-bottom: 20px;
+    font-size: 1.5em;
+    font-weight: 500;
+}
+
+h3 {
+    margin-top: 15px;
+    font-size: 1.2em;
+    font-weight: 500;
+}
+
+/* General div margin, can be overridden by more specific rules */
+div:not(.modal):not(.modal-content):not(.modal-buttons):not(.button-group):not(.inline-form-group) {
+    margin-bottom: 10px;
+}
+
+input[type="text"], input[type="number"] {
+    width: 60%;
+    min-width: 150px;
+}
+
+input[type="number"] {
+    width: 80px;
+}
+
+#branchesContainer {
+    background-color: var(--vscode-editor-background);
+}
+
+/* Style for the whole form layout */
+.form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Make sure buttons in a group are the same width */
+.button-group button {
+    flex: 1;
+}
+
+/* Styles for inline frequency group */
+.inline-form-group {
+  display: flex;
+  align-items: center;
+  gap: 8px; 
+  margin-bottom: 10px;
+}
+
+.inline-form-group label {
+   width: 120px; /* Set a fixed width for labels in inline groups */
+   flex-shrink: 0; /* Prevent label from shrinking */
+   margin-right: 5px; 
+}
+
+.inline-form-group input[type="number"] {
+  width: 60px; 
+  flex-grow: 0; /* Don't grow */
+}
+
+.inline-form-group input[type="text"] {
+  flex-grow: 1; /* Allow text input to take available space */
+  min-width: 150px;
+}
+
+.inline-form-group button {
+    flex-shrink: 0; /* Prevent button from shrinking */
+}
+
+/* Modal Styles */
+.modal {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.6);
+  display: flex; /* Will be set to flex by JS to show */
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  padding: 25px;
+  border-radius: 5px;
+  border: 1px solid var(--vscode-panel-border, var(--vscode-contrastBorder, #333));
+  min-width: 350px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.modal-content h4 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.3em;
+}
+
+.modal-content label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  width: auto; /* Ensure label takes natural width */
+}
+
+.modal-content input[type="text"] {
+  width: calc(100% - 12px); /* Full width minus padding */
+  margin-bottom: 20px;
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+} 
