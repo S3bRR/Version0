@@ -1,90 +1,85 @@
-# Version0 - GitHub Backup Extension
+# Version0 – GitHub Backup Extension for VS Code
 
-Version0 automatically creates versioned backup branches of your current workspace to a specified GitHub repository, providing a safety net for your development work.
+![Version0 Logo](Version0_image.png)
+
+> Automatically create time-stamped backup branches of your current workspace in a GitHub repository.
+
+---
 
 ## Features
 
-- **Automatic Backups:** Periodically backs up your entire workspace at configurable intervals
-- **Manual Backups:** Trigger backups on demand with optional notes
-- **Create Private Repo:** Create a new private GitHub repository directly from the extension
-- **Sync:** Verify GitHub authentication and repository accessibility
-- **Versioned Branches:** Creates timestamped branches like `v1.0/YYYY-MM-DD_HH-mm-ss`, automatically incrementing versions
-- **Push Current Branch:** Safely push your current working branch to your target backup repository
-- **Restore:** Easily checkout and recover previous backup branches
-- **Webview UI:** Configure settings, view backup branches, and trigger actions from the VS Code sidebar
-- **GitHub Authentication:** Uses VS Code's built-in GitHub authentication for security
+- **Automatic Backups** – Periodically backup your entire workspace at a configurable interval.
+- **Manual Backups** – Trigger a backup on demand with one click.
+- **Create Private Repo** – Create a new private GitHub repository directly from the sidebar.
+- **Sync** – Verify GitHub authentication and repository access before backing up.
+- **Versioned Branches** – Branch names follow `v1.0/YYYY-MM-DD_HH-mm-ss`, automatically incrementing version numbers.
+- **Push Current Branch** – Push your current working branch as a backup branch.
+- **Restore** – Checkout and restore from any available backup branch.
+- **Webview UI** – Configure settings, view branches, and trigger actions in a modern sidebar.
+- **GitHub Authentication** – Seamlessly uses VS Code's built-in GitHub authentication flow.
 
 ## Requirements
 
-- VS Code 1.60.0 or later
-- Git installed and available in your PATH
-- GitHub account
-- Internet connection for GitHub API access
+- VS Code **1.60** or later
+- **Git** installed and available in your PATH
+- A **GitHub** account with repo permissions
+- Internet access for GitHub API calls
 
-## Setup
+## Installation
 
-1. Click the Version0 icon in the VS Code activity bar
-2. The extension will prompt you to authenticate with GitHub if needed
-3. Configure your backup settings in the sidebar view:
-   - **Set Backup Frequency:** Enter the interval in minutes (0 disables automatic backups)
-   - **Set Target Repository URL:** Enter a GitHub repository URL (e.g., `https://github.com/your-username/backup-repo.git`)
-   - **Create Private Repo:** Alternatively, click this button to create a new private repository and set it as your target
+### From the Marketplace
+
+1. Open the **Extensions** view in VS Code (`⇧⌘X` / `Ctrl+Shift+X`).
+2. Search for **Version0** by `v0design` and click **Install**.
+3. Reload or restart VS Code if prompted.
+
+### From a VSIX Package
+
+```bash
+npm install -g vsce            # if you don't already have vsce installed
+vsce package                   # Builds version0-<version>.vsix
+code --install-extension version0-<version>.vsix
+```
 
 ## Usage
 
-### Configure Settings
-
-In the Version0 sidebar:
-- **Frequency (min):** Set the automatic backup interval (in minutes)
-- **Target Repo URL:** Enter the GitHub repository URL where backup branches will be pushed
-- **Create Private Repo:** Create a new private GitHub repository and set it as your target
-- **Sync:** Verify authentication and repository accessibility
-
-### Backup Operations
-
-- **Backup Now:** Trigger an immediate backup of your workspace
-  - Optional: Add notes to the backup when prompted for manual backups
-- **Push Current Branch:** Push your active branch to the target repository
-- **Restore from Backup:** Select a branch from the backup list to restore your workspace
-
-## Advanced Configuration
-
-Edit your VS Code settings (settings.json) to modify these options:
-
-- `version0.targetBackupRepoUrl`: The URL of the GitHub repository for backups
-- `version0.backupInterval`: Automatic backup interval in minutes (0 disables automatic backups)
-- `version0.enableNotifications`: Show status notifications (default: true)
-- `version0.autoStart`: Start automatic backups when VS Code starts (default: false)
+1. Click the **Version0** icon in the Activity Bar to open the sidebar.
+2. **Connect with GitHub**: Click the button and complete the VS Code GitHub authentication prompt.
+3. **Configure**:
+   - **Frequency** – Enter a backup interval in minutes and click **Save**.
+   - **Target Repo** – Paste an existing GitHub repo URL or click **Create Private Repo**.
+4. Use buttons to:
+   - **Sync** – Confirm your token and repo access.
+   - **Backup Now** – Trigger an immediate backup.
+   - **Push Current Branch** – Push the current branch to your backup repo.
+5. **Backup Branches**: View a list of generated branches, and click **Restore** next to any branch to recover your workspace.
 
 ## Commands
 
-- **Version0: Start GitHub Backup** - Start the backup service
-- **Version0: Trigger Manual Backup** - Manually trigger a backup
-- **Version0: Authenticate with GitHub** - Manually trigger GitHub authentication
-- **Version0: Open WebView** - Open the Version0 sidebar view
+You can also run these commands via the **Command Palette** (`⇧⌘P` / `Ctrl+Shift+P`):
 
-## Troubleshooting
+- `Version0: Start` – Begin the automatic backup timer.
+- `Version0: Trigger Backup` – Show a reminder to use the **Backup Now** button.
 
-### Authentication Issues
-- If you encounter authentication problems, click the "Sync" button to verify your GitHub credentials
-- You may need to reauthenticate using the command `Version0: Authenticate with GitHub`
+## Configuration
 
-### Git Repository Issues
-- Ensure your workspace is a valid Git repository
-- If backups fail with Git errors, try initializing the repository with `git init` followed by at least one commit
-- The extension will offer to initialize Git if your workspace is not a repository
+Settings are available in **Settings** (`⌘,` / `Ctrl+,`) under **Extensions › Version0**:
 
-### Branch Creation Failures
-- If you experience errors about existing branches, wait a few seconds and try again
-- The extension automatically handles branch name collisions with unique timestamps
+- **version0.backupInterval** (number) – Backup interval in minutes.
+- **version0.autoStart** (boolean) – Automatically start backups when VS Code launches.
 
-## Security
+## Contributing
 
-Version0 uses VS Code's built-in Authentication API to securely handle GitHub access via OAuth. Your credentials are managed by VS Code, not the extension directly.
+Contributions are welcome! Please fork the repo, make your changes, and open a pull request.
+
+1. Clone the repository: `git clone https://github.com/YourUser/Version0.git`
+2. Install dependencies: `npm install`
+3. Develop, test, and lint: `npm run vscode:prepublish && npm test`
+4. Submit your pull request.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
