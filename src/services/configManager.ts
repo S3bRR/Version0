@@ -20,7 +20,9 @@ export class ConfigManager {
   
   // GitHub Token management
   async getGitHubToken(): Promise<string | undefined> {
-    return await this.context.secrets.get('version0.githubToken');
+    const token = await this.context.secrets.get('version0.githubToken');
+    if (!token || token.trim() === '') return undefined;
+    return token;
   }
   
   async setGitHubToken(token: string): Promise<void> {
