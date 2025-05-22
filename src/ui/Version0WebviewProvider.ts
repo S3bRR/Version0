@@ -108,14 +108,18 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 							try {
 								const authSuccess = await this._githubService.authenticate();
 								if (authSuccess) {
-									this._view?.webview.postMessage({ command: 'updateStatus', text: 'Authenticated. Please try Sync again.' });
+									this.updateAuthStatus(); // Update global UI auth state
+									this._view?.webview.postMessage({ command: 'updateStatus', text: 'Authenticated successfully. Continuing sync...' });
+									// Do NOT return, allow to proceed with sync
 								} else {
 									this._view?.webview.postMessage({ command: 'updateStatus', text: 'Authentication failed. Please try Sync again after authenticating.' });
+									return; // Return if auth failed
 								}
 							} catch (authError) {
 								this._view?.webview.postMessage({ command: 'updateStatus', text: 'Authentication process failed.' });
+								return; // Return on auth error
 							}
-							return;
+							// If authSuccess was true, we fall through here
 						}
 
 						progress.report({ increment: 30, message: "Checking target repository URL..." });
@@ -618,7 +622,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 							} else {
 								if(branchesContainer) branchesContainer.textContent = 'No backup branches found or target repo not set/accessible.';
 							}
-						} else if (message.type === 'updateStatus') {
+						} else if (message.command === 'updateStatus') { // Changed from message.type
 							if(statusDiv) statusDiv.textContent = message.text;
 						} else if (message.type === 'updateState') {
 							if(message.frequency) {
