@@ -100,9 +100,9 @@ export class GithubService implements vscode.Disposable {
         if (pathParts.length < 2) return null;
         const repoName = pathParts[1].endsWith('.git') ? pathParts[1].slice(0, -4) : pathParts[1];
         return { owner: pathParts[0], repo: repoName };
-      } else if (!url.includes('/') && url.split('/').length === 2) {
+      } else if (url.includes('/') && url.split('/').length === 2 && !url.startsWith('http') && !url.startsWith('git@')) {
         const parts = url.split('/');
-        return { owner: parts[0], repo: parts[1] };
+        return { owner: parts[0], repo: parts[1].endsWith('.git') ? parts[1].slice(0, -4) : parts[1] };
       }
     } catch (e) {
       console.error(`Error parsing repo URL '${url}':`, e);
@@ -122,10 +122,10 @@ export class GithubService implements vscode.Disposable {
     }
     const { owner, repo } = repoInfo;
     try {
+      // Fetch all branches from the remote repository to be presented as potential backup sources.
       const refs = await octokit.paginate(octokit.git.listMatchingRefs, {
         owner,
-        repo,
-        ref: 'heads/v'
+        repo
       });
       const branchNames = refs.map((ref: { ref: string }) => ref.ref.replace(/^refs\/heads\//, ''));
       return branchNames;
