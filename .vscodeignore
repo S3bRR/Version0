@@ -1,0 +1,25 @@
+.vscode/**
+.vscode-test/**
+src/**
+test/**
+out/**
+node_modules/**
+!node_modules/@vscode/webview-ui-toolkit/**
+
+*.vsix
+*.log
+*.tsbuildinfo
+
+tsconfig.json
+webpack.config.js
+.gitignore
+.DS_Store
+
+# Include specific node_modules needed at runtime if not bundled
+# Example: !node_modules/simple-git/** 
+# Check if webpack bundles these correctly first.
+# We will include the toolkit explicitly above.
+
+# Ensure media files for webview are included
+!media/main.js
+!resources/icon.svg 
