@@ -23,8 +23,7 @@ suite('Extension Test Suite', () => {
     const commands = await vscode.commands.getCommands();
     
     assert.ok(commands.includes('version0.start'), 'Start command not registered');
-    assert.ok(commands.includes('version0.addRepository'), 'Add repository command not registered');
     assert.ok(commands.includes('version0.triggerBackup'), 'Trigger backup command not registered');
-    assert.ok(commands.includes('version0.showSettings'), 'Show settings command not registered');
+    assert.ok(commands.includes('version0.restoreLatestBackup'), 'Restore latest command not registered');
   });
 }); 
