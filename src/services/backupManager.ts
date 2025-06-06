@@ -6,7 +6,7 @@ import { ConfigManager } from './configManager';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
-export class BackupManager {
+export class BackupManager implements vscode.Disposable {
   private githubService: GithubService;
   private configManager: ConfigManager;
   private timer: NodeJS.Timeout | undefined;
@@ -23,7 +23,7 @@ export class BackupManager {
     });
   }
 
-  private async initializeGit(forceReInit: boolean = false): Promise<boolean> {
+  private async initializeGit(forceReInit = false): Promise<boolean> {
     const currentWorkspaceFolders = vscode.workspace.workspaceFolders;
     const newWorkspaceRoot = currentWorkspaceFolders && currentWorkspaceFolders.length > 0
       ? currentWorkspaceFolders[0].uri.fsPath
@@ -154,7 +154,7 @@ export class BackupManager {
     }
   }
 
-  private async performBackup(isManual: boolean = false): Promise<void> {
+  private async performBackup(isManual = false): Promise<void> {
     const didInitialize = await this.initializeGit(true); // Force re-check/re-init
 
     if (!this.workspaceRoot) {
@@ -596,6 +596,11 @@ export class BackupManager {
       }
     } catch (e) { /* ignore */ }
     return null;
+  }
+
+  /** Dispose resources such as timers */
+  public dispose(): void {
+    this.stop();
   }
 
   // Remove old methods
