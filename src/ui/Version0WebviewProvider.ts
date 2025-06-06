@@ -293,13 +293,13 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 
 	// Helper to send current state to the webview
 	public updateWebviewState() {
-		if (this._view) {
-			this._view.webview.postMessage({
-				command: 'updateState',
-				frequency: this._configManager.getBackupInterval(),
-				targetRepoUrl: this._configManager.getTargetBackupRepoUrl()
-			});
-		}
+                if (this._view) {
+                        this._view.webview.postMessage({
+                                command: 'updateState',
+                                frequency: '',
+                                targetRepoUrl: ''
+                        });
+                }
 	}
 
 	private async updateAuthStatus() {
@@ -328,8 +328,8 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 		const styleMainUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.css'));
 
 		const nonce = getNonce();
-		const currentFrequency = this._configManager.getBackupInterval();
-		const currentTargetRepoUrl = this._configManager.getTargetBackupRepoUrl() || '';
+                const currentFrequency = '';
+                const currentTargetRepoUrl = '';
 
 		return `<!DOCTYPE html>
 			<html lang="en">
@@ -378,13 +378,13 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 				<div class="form-container">
 					<div class="vertical-form-group">
 						<label for="frequency">Frequency (min):</label>
-						<input type="number" id="frequency" value="${currentFrequency}" min="1">
+                                                <input type="number" id="frequency" value="" min="1">
 						<button id="saveFrequencyBtn">Save</button>
 					</div>
 
 					<div class="vertical-form-group">
 						<label for="targetRepo">Target Repo URL:</label>
-						<input type="text" id="targetRepo" value="${currentTargetRepoUrl}" placeholder="e.g., https://github.com/user/repo.git">
+                                                <input type="text" id="targetRepo" value="" placeholder="e.g., https://github.com/user/repo.git">
 						<button id="saveTargetRepoBtn">Save</button>
 					</div>
 					
@@ -452,11 +452,11 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 					let authStatus;
 					let deviceCodeInstructions;
 
-					// State object, initialized with current config values
-					let state = vscode.getState() || {
-						frequency: ${currentFrequency},
-						targetRepoUrl: "${currentTargetRepoUrl}"
-					};
+                                        // State object starts blank so user must input values each session
+                                        let state = {
+                                                frequency: '',
+                                                targetRepoUrl: ''
+                                        };
 
 					// Wait for the DOM to be fully loaded before accessing elements
 					document.addEventListener('DOMContentLoaded', () => {
