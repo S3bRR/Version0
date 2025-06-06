@@ -30,6 +30,10 @@
       {
         "command": "version0.authenticateGitHub",
         "title": "Version0: Authenticate with GitHub"
+      },
+      {
+        "command": "version0.restoreLatestBackup",
+        "title": "Version0: Restore Latest Backup"
       }
     ],
     "viewsContainers": {
