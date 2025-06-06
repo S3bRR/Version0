@@ -5,11 +5,11 @@ suite('Extension Test Suite', () => {
   vscode.window.showInformationMessage('Starting extension tests');
 
   test('Extension should be present', () => {
-    assert.ok(vscode.extensions.getExtension('version0'));
+    assert.ok(vscode.extensions.getExtension('v0Design.version0'));
   });
 
   test('Extension should activate', async () => {
-    const extension = vscode.extensions.getExtension('version0');
+    const extension = vscode.extensions.getExtension('v0Design.version0');
     if (!extension) {
       assert.fail('Extension not found');
       return;

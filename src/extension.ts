@@ -46,7 +46,8 @@ export async function activate(context: vscode.ExtensionContext) {
     startCommand,
     triggerBackupCommand,
     restoreLatestCommand,
-    githubService
+    githubService,
+    backupManager
   );
   
   // Auto-start if configured

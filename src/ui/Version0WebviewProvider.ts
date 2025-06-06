@@ -45,7 +45,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 		// Handle messages from the webview
 		webviewView.webview.onDidReceiveMessage(async message => {
 			switch (message.command) {
-				case 'saveFrequency':
+				case 'saveFrequency': {
 					const frequency = parseInt(message.text, 10);
 					if (!isNaN(frequency) && frequency > 0) {
 						this._configManager.setBackupInterval(frequency);
@@ -56,7 +56,8 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						vscode.window.showErrorMessage('Invalid frequency value.');
 					}
 					return;
-				case 'saveTargetRepo':
+				}
+				case 'saveTargetRepo': {
 					const repoUrl = message.text;
 					if (repoUrl && (repoUrl.startsWith('https://') || repoUrl.includes(':'))) {
 						await this._configManager.setTargetBackupRepoUrl(repoUrl);
@@ -67,7 +68,8 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						vscode.window.showErrorMessage('Invalid repository URL format.');
 					}
 					return;
-				case 'createRepo':
+				}
+				case 'createRepo': {
 					const repoNameToCreate = message.name;
 					if (!repoNameToCreate) {
 						vscode.window.showErrorMessage('Repository name cannot be empty.');
@@ -93,6 +95,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						}
 					});
 					return;
+				}
 				case 'syncRepo':
 					vscode.window.withProgress({
 						location: vscode.ProgressLocation.Notification,
@@ -165,7 +168,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 				case 'getBranches':
 					await this.refreshBranches();
 					return;
-				case 'restoreBackup':
+				case 'restoreBackup': {
 					const branchToRestore = message.branchName;
 					if (!branchToRestore) return;
 
@@ -184,6 +187,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						}
 					});
 					return;
+				}
 				case 'setGitHubToken':
 					if (message.token && message.token.trim() !== '') {
 						await this._githubService.setToken(message.token.trim());
@@ -211,7 +215,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						vscode.window.showErrorMessage('GitHub login failed.');
 					}
 					return;
-				case 'requestRestore': // New case to handle confirmation
+				case 'requestRestore': { // New case to handle confirmation
 					const branchToRequestRestore = message.branchName;
 					if (!branchToRequestRestore) return;
 
@@ -252,6 +256,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						this._view?.webview.postMessage({ command: 'updateStatus', text: 'Restore cancelled.' });
 					}
 					return;
+				}
 			}
 		}, undefined, this.context.subscriptions);
 
@@ -294,11 +299,13 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 	// Helper to send current state to the webview
 	public updateWebviewState() {
                 if (this._view) {
-                        this._view.webview.postMessage({
-                                command: 'updateState',
-                                frequency: '',
-                                targetRepoUrl: ''
-                        });
+			const frequency = this._configManager.getBackupInterval().toString();
+			const targetRepoUrl = this._configManager.getTargetBackupRepoUrl() || '';
+			this._view.webview.postMessage({
+				command: 'updateState',
+				frequency,
+				targetRepoUrl
+			});
                 }
 	}
 
@@ -328,8 +335,8 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 		const styleMainUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.css'));
 
 		const nonce = getNonce();
-                const currentFrequency = '';
-                const currentTargetRepoUrl = '';
+		const currentFrequency = this._configManager.getBackupInterval().toString();
+		const currentTargetRepoUrl = this._configManager.getTargetBackupRepoUrl() || '';
 
 		return `<!DOCTYPE html>
 			<html lang="en">
@@ -378,13 +385,13 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 				<div class="form-container">
 					<div class="vertical-form-group">
 						<label for="frequency">Frequency (min):</label>
-                                                <input type="number" id="frequency" value="" min="1">
+                                                <input type="number" id="frequency" value="${currentFrequency}" min="1">
 						<button id="saveFrequencyBtn">Save</button>
 					</div>
 
 					<div class="vertical-form-group">
 						<label for="targetRepo">Target Repo URL:</label>
-                                                <input type="text" id="targetRepo" value="" placeholder="e.g., https://github.com/user/repo.git">
+                                                <input type="text" id="targetRepo" value="${currentTargetRepoUrl}" placeholder="e.g., https://github.com/user/repo.git">
 						<button id="saveTargetRepoBtn">Save</button>
 					</div>
 					
@@ -573,34 +580,23 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 					window.addEventListener('message', event => {
 						const message = event.data;
 
-						// Handle device code flow messages
-						if (message.type === 'github-auth-status') {
-							if (connectBtn && authStatus && deviceCodeInstructions) {
-								if (message.authenticated) {
-									connectBtn.style.display = 'none';
-									deviceCodeInstructions.style.display = 'none';
-									authStatus.textContent = 'Connected as ' + message.username;
-								} else {
-									connectBtn.style.display = '';
-									deviceCodeInstructions.style.display = 'none';
-									authStatus.textContent = 'Not connected to GitHub.';
-								}
-								if(frequencyInput) frequencyInput.value = message.value;
-								if(statusDiv) statusDiv.textContent = 'Frequency saved.';
-								state.frequency = message.value;
-								vscode.setState(state);
-							}
-						} else if (message.type === 'targetRepoSaved') {
+						// Handle frequency saved
+						if (message.command === 'frequencySaved') {
+							if (frequencyInput) frequencyInput.value = message.value;
+							if (statusDiv) statusDiv.textContent = 'Frequency saved.';
+							state.frequency = message.value;
+							vscode.setState(state);
+						} else if (message.command === 'targetRepoSaved') {
 							if(targetRepoInput) targetRepoInput.value = message.value;
 							if(statusDiv) statusDiv.textContent = 'Target repository saved.';
 							state.targetRepoUrl = message.value;
 							vscode.setState(state);
-						} else if (message.type === 'repoCreated') {
+						} else if (message.command === 'repoCreated') {
 							if(targetRepoInput) targetRepoInput.value = message.newUrl;
 							if(statusDiv) statusDiv.textContent = message.message || 'Repository created and target URL updated.';
 							state.targetRepoUrl = message.newUrl;
 							vscode.setState(state);
-						} else if (message.type === 'updateBranches') {
+						} else if (message.command === 'updateBranches') {
 							if(branchesContainer) branchesContainer.innerHTML = '';
 							if (message.branches && message.branches.length > 0) {
 								const ul = document.createElement('ul');
@@ -622,9 +618,9 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 							} else {
 								if(branchesContainer) branchesContainer.textContent = 'No backup branches found or target repo not set/accessible.';
 							}
-						} else if (message.command === 'updateStatus') { // Changed from message.type
+						} else if (message.command === 'updateStatus') {
 							if(statusDiv) statusDiv.textContent = message.text;
-						} else if (message.type === 'updateState') {
+						} else if (message.command === 'updateState') {
 							if(message.frequency) {
 								if(frequencyInput) frequencyInput.value = message.frequency;
 								if(state) state.frequency = message.frequency;
@@ -639,14 +635,14 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 							} else {
 								if(branchesContainer) branchesContainer.textContent = 'Set target repository URL to see branches.';
 							}
-						} else if (message.type === 'github-device-code') {
+						} else if (message.command === 'github-device-code') {
 							if (connectBtn && deviceCodeInstructions && authStatus) {
 								connectBtn.style.display = 'none';
 								deviceCodeInstructions.style.display = '';
 								deviceCodeInstructions.innerHTML = '<p>To connect, visit <a href="' + message.verificationUri + '" target="_blank">' + message.verificationUri + '</a> and enter the code:</p><pre style="font-size:1.2em;">' + message.userCode + '</pre><p>Waiting for authorization...</p>';
 								authStatus.textContent = '';
 							}
-						} else if (message.type === 'github-auth-error') {
+						} else if (message.command === 'github-auth-error') {
 							if (deviceCodeInstructions && connectBtn && authStatus) {
 								deviceCodeInstructions.style.display = '';
 								deviceCodeInstructions.innerHTML = '<p style="color:red;">' + message.error + '</p>';
