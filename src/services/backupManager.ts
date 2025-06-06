@@ -462,6 +462,41 @@ export class BackupManager {
     }
   }
 
+  /**
+   * Determine the most recent backup branch available in the target repository.
+   */
+  private async getLatestBackupBranch(): Promise<string | undefined> {
+    const targetRepoUrl = this.configManager.getTargetBackupRepoUrl();
+    if (!targetRepoUrl) {
+      return undefined;
+    }
+    const branches = await this.githubService.getBackupBranchesFromTargetUrl(targetRepoUrl);
+    if (branches.length === 0) {
+      return undefined;
+    }
+    const parsed = branches
+      .map(b => {
+        const parts = b.split('/');
+        const ts = parts[1];
+        const time = moment(ts, 'YYYY-MM-DD_HH-mm-ss', true);
+        return { name: b, time: time.isValid() ? time.toDate().getTime() : 0 };
+      })
+      .filter(b => b.time > 0)
+      .sort((a, b) => b.time - a.time);
+    return parsed.length > 0 ? parsed[0].name : undefined;
+  }
+
+  /**
+   * Restore the workspace using the latest available backup branch.
+   */
+  public async restoreLatestBackup(): Promise<void> {
+    const latest = await this.getLatestBackupBranch();
+    if (!latest) {
+      throw new Error('No backup branches found to restore.');
+    }
+    await this.restoreFromBackup(latest);
+  }
+
   // --- End Restore Functionality ---
 
   // --- Push Current State Functionality ---

@@ -15,6 +15,7 @@
 - **Versioned Branches** – Branch names follow `v1.0/YYYY-MM-DD_HH-mm-ss`, automatically incrementing version numbers.
 - **Push Current Branch** – Push your current working branch as a backup branch.
 - **Restore** – Checkout and restore from any available backup branch.
+- **Restore Latest** – Quickly restore the most recent backup branch.
 - **Webview UI** – Configure settings, view branches, and trigger actions in a modern sidebar.
 - **GitHub Authentication** – Seamlessly uses VS Code's built-in GitHub authentication flow.
 
@@ -60,6 +61,7 @@ You can also run these commands via the **Command Palette** (`⇧⌘P` / `Ctrl+S
 
 - `Version0: Start` – Begin the automatic backup timer.
 - `Version0: Trigger Backup` – Show a reminder to use the **Backup Now** button.
+- `Version0: Restore Latest Backup` – Restore your workspace from the most recent backup branch.
 
 ## Configuration
 

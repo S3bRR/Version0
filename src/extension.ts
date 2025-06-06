@@ -28,15 +28,24 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage('Version0 backup service started');
     webviewProvider?.updateWebviewState();
   });
-  
+
   const triggerBackupCommand = vscode.commands.registerCommand('version0.triggerBackup', async () => {
     vscode.window.showInformationMessage('Please use the "Backup Now" button in the Version0 sidebar view.');
+  });
+
+  const restoreLatestCommand = vscode.commands.registerCommand('version0.restoreLatestBackup', async () => {
+    try {
+      await backupManager?.restoreLatestBackup();
+    } catch (err: any) {
+      vscode.window.showErrorMessage(`Version0: ${err.message}`);
+    }
   });
   
   // Register disposables
   context.subscriptions.push(
     startCommand,
     triggerBackupCommand,
+    restoreLatestCommand,
     githubService
   );
   
