@@ -14,7 +14,8 @@ Version0 is a powerful VS Code extension that automatically creates backup branc
 - **Session-only Target Repository**: Target repo URL resets each VS Code session for security
 
 ### GitHub Integration
-- **Native GitHub Authentication**: Uses VS Code's built-in GitHub authentication
+- **Smart Authentication**: VS Code OAuth (when available) + Manual GitHub PAT fallback
+- **Cross-IDE Compatibility**: Works seamlessly in VS Code, Cursor IDE, and other forks
 - **Repository Management**: Create private repositories directly from the extension
 - **Branch Management**: View and manage backup branches
 - **Repository Access Verification**: Automatic sync and access checks
@@ -43,10 +44,10 @@ Version0 is a powerful VS Code extension that automatically creates backup branc
 3. Search for "Version0"
 4. Click Install
 
-### Manual Installation
+### Manual Installation (VS Code & Cursor IDE)
 1. Download the latest `.vsix` file from releases
-2. Open VS Code
-3. Press `Ctrl+Shift+P` and type "Extensions: Install from VSIX"
+2. **For VS Code**: Press `Ctrl+Shift+P` and type "Extensions: Install from VSIX"
+3. **For Cursor**: Go to Extensions → "..." menu → "Install from VSIX"
 4. Select the downloaded `.vsix` file
 
 ### From Source
@@ -61,10 +62,19 @@ code --install-extension version0-*.vsix
 ## 🔧 Setup & Configuration
 
 ### 1. GitHub Authentication
+
+**VS Code Users:**
 - Open the Version0 sidebar panel
 - Click "Connect with GitHub"
 - Authorize VS Code to access your GitHub account
-- The extension will automatically use VS Code's GitHub authentication
+- The extension will automatically use VS Code's built-in GitHub authentication
+
+**Cursor IDE Users:**
+- Open the Version0 sidebar panel
+- You'll see a "GitHub Personal Access Token" input field
+- Click "How to create a GitHub Personal Access Token" for detailed instructions
+- Create a GitHub PAT with `repo` and `read:user` scopes
+- Paste the token and click "Save Token"
 
 ### 2. Configure Target Repository
 - In the Version0 panel, enter your target repository URL
@@ -251,10 +261,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📊 Technical Specifications
 
-- **Minimum VS Code Version**: 1.60.0
+- **IDE Compatibility**: VS Code 1.60.0+, Cursor IDE, other VS Code forks
+- **Authentication**: VS Code OAuth (when available) + Manual GitHub PAT fallback
 - **Node.js Compatibility**: 14.x+
 - **TypeScript Version**: 4.3.2
-- **Bundle Size**: ~500KB (optimized)
+- **Bundle Size**: ~800KB (optimized)
 - **Memory Usage**: <50MB typical
 - **Platform Support**: Windows, macOS, Linux
 
