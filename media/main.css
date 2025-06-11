@@ -571,3 +571,87 @@ input:focus-visible {
     --v0-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
   }
 }
+
+/* Authentication sections */
+.auth-section {
+  margin: var(--v0-space-lg) 0;
+  padding: var(--v0-space-lg);
+  background: var(--v0-surface-elevated);
+  border: 1px solid var(--v0-border);
+  border-radius: var(--v0-radius-md);
+}
+
+.auth-section h3 {
+  margin: 0 0 var(--v0-space-md) 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--v0-text-primary);
+}
+
+#vscode-auth-section, #manual-auth-section {
+  margin-top: var(--v0-space-md);
+  padding: var(--v0-space-md);
+  background: var(--v0-surface);
+  border: 1px solid var(--v0-border-subtle);
+  border-radius: var(--v0-radius-sm);
+}
+
+#github-token-input {
+  width: 100%;
+  margin-bottom: var(--v0-space-md);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9rem;
+}
+
+.auth-help {
+  margin-top: var(--v0-space-sm);
+  font-size: 0.85rem;
+  color: var(--v0-text-muted);
+}
+
+.auth-help a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.auth-help a:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}
+
+/* Token instructions modal specific styles */
+#tokenInstructionsModal .modal-content {
+  max-width: 600px;
+}
+
+#tokenInstructionsModal ol {
+  margin: var(--v0-space-md) 0;
+  padding-left: var(--v0-space-xl);
+  color: var(--v0-text-primary);
+}
+
+#tokenInstructionsModal li {
+  margin-bottom: var(--v0-space-sm);
+  line-height: 1.5;
+}
+
+#tokenInstructionsModal ul {
+  margin: var(--v0-space-sm) 0;
+  padding-left: var(--v0-space-lg);
+}
+
+#tokenInstructionsModal strong {
+  color: var(--v0-text-primary);
+  font-weight: 600;
+}
+
+#tokenInstructionsModal a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+
+#tokenInstructionsModal a:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}

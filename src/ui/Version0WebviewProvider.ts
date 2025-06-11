@@ -204,16 +204,32 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 					return;
 				case 'githubLogin':
 					// Trigger VS Code GitHub authentication session
-					try {
-						const session = await vscode.authentication.getSession('github', ['repo'], { createIfNone: true });
-						if (session && this._view) {
-							await this._githubService.setToken(session.accessToken);
-							vscode.window.showInformationMessage('GitHub authenticated.');
-							this.updateAuthStatus();
-						}
-					} catch (error) {
-						vscode.window.showErrorMessage('GitHub login failed.');
+					const authSuccess = await this._githubService.authenticateWithVSCode();
+					if (authSuccess) {
+						vscode.window.showInformationMessage('GitHub authenticated.');
+						this.updateAuthStatus();
+					} else {
+						vscode.window.showErrorMessage('GitHub login failed. Try manual token instead.');
 					}
+					return;
+				case 'saveManualToken':
+					if (message.token && message.token.trim() !== '') {
+						await this._githubService.setToken(message.token.trim());
+						const isValid = await this._githubService.isAuthenticated();
+						if (isValid) {
+							vscode.window.showInformationMessage('GitHub token saved and validated.');
+							this.updateAuthStatus();
+						} else {
+							vscode.window.showErrorMessage('Invalid GitHub token. Please check your token and try again.');
+						}
+					} else {
+						vscode.window.showErrorMessage('Token cannot be empty.');
+					}
+					return;
+				case 'clearManualToken':
+					await this._githubService.clearToken();
+					vscode.window.showInformationMessage('GitHub token removed.');
+					this.updateAuthStatus();
 					return;
 				case 'requestRestore': { // New case to handle confirmation
 					const branchToRequestRestore = message.branchName;
@@ -312,6 +328,8 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 	private async updateAuthStatus() {
 		if (!this._view) return;
 		const isAuthenticated = await this._githubService.isAuthenticated();
+		const vsCodeAuthAvailable = await this._githubService.isVSCodeAuthAvailable();
+		
 		let status = 'Not connected';
 		let user = '';
 		if (isAuthenticated) {
@@ -326,7 +344,14 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 				status = 'Connected (user unknown)';
 			}
 		}
-		this._view.webview.postMessage({ command: 'updateAuthStatus', status, user, isAuthenticated });
+		
+		this._view.webview.postMessage({ 
+			command: 'updateAuthStatus', 
+			status, 
+			user, 
+			isAuthenticated,
+			vsCodeAuthAvailable 
+		});
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview): string {
@@ -413,11 +438,56 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 					<div class="auth-section">
 						<h3>GitHub Authentication</h3>
 						<div id="github-auth-status">Checking...</div>
-						<button id="connect-github-btn">Connect with GitHub</button>
-						<div id="device-code-instructions" style="display:none;"></div>
-						<div class="auth-help">
-							<small>Connect your GitHub account to enable backup.</small>
+						
+						<!-- VS Code Authentication (auto-detected) -->
+						<div id="vscode-auth-section" style="display:none;">
+							<button id="connect-github-btn">Connect with GitHub</button>
+							<div class="auth-help">
+								<small>Use VS Code's built-in GitHub authentication.</small>
+							</div>
 						</div>
+						
+						<!-- Manual Token Authentication (fallback) -->
+						<div id="manual-auth-section" style="display:none;">
+							<div class="vertical-form-group">
+								<label for="github-token-input">GitHub Personal Access Token:</label>
+								<input type="password" id="github-token-input" placeholder="Paste your GitHub PAT here">
+								<div class="button-group">
+									<button id="save-token-btn">Save Token</button>
+									<button id="clear-token-btn">Clear Token</button>
+								</div>
+							</div>
+							<div class="auth-help">
+								<small>
+									<a href="#" id="token-instructions-link">How to create a GitHub Personal Access Token</a>
+								</small>
+							</div>
+						</div>
+						
+						<div id="device-code-instructions" style="display:none;"></div>
+					</div>
+					
+					<!-- GitHub PAT Instructions Modal -->
+					<div id="tokenInstructionsModal" class="modal" style="display:none;">
+					  <div class="modal-content">
+					    <h4>Create GitHub Personal Access Token</h4>
+					    <ol>
+					      <li>Go to <a href="https://github.com/settings/tokens" target="_blank">GitHub Settings > Personal Access Tokens</a></li>
+					      <li>Click "Generate new token" → "Generate new token (classic)"</li>
+					      <li>Give it a name like "Version0 Extension"</li>
+					      <li>Select these scopes:
+					        <ul>
+					          <li><strong>repo</strong> - Full repository access</li>
+					          <li><strong>read:user</strong> - Read user profile</li>
+					        </ul>
+					      </li>
+					      <li>Click "Generate token"</li>
+					      <li>Copy the token and paste it above</li>
+					    </ol>
+					    <div class="modal-buttons">
+					      <button id="closeInstructionsBtn">Close</button>
+					    </div>
+					  </div>
 					</div>
 				</div>
 
@@ -458,6 +528,16 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 					let connectBtn;
 					let authStatus;
 					let deviceCodeInstructions;
+					
+					// New manual auth elements
+					let vsCodeAuthSection;
+					let manualAuthSection;
+					let githubTokenInput;
+					let saveTokenBtn;
+					let clearTokenBtn;
+					let tokenInstructionsLink;
+					let tokenInstructionsModal;
+					let closeInstructionsBtn;
 
                                         // State object starts blank so user must input values each session
                                         let state = {
@@ -488,6 +568,16 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						connectBtn = document.getElementById('connect-github-btn');
 						authStatus = document.getElementById('github-auth-status');
 						deviceCodeInstructions = document.getElementById('device-code-instructions');
+						
+						// Get references to new manual auth elements
+						vsCodeAuthSection = document.getElementById('vscode-auth-section');
+						manualAuthSection = document.getElementById('manual-auth-section');
+						githubTokenInput = document.getElementById('github-token-input');
+						saveTokenBtn = document.getElementById('save-token-btn');
+						clearTokenBtn = document.getElementById('clear-token-btn');
+						tokenInstructionsLink = document.getElementById('token-instructions-link');
+						tokenInstructionsModal = document.getElementById('tokenInstructionsModal');
+						closeInstructionsBtn = document.getElementById('closeInstructionsBtn');
 
 						// Initialize inputs from state
 						if(frequencyInput) frequencyInput.value = state.frequency;
@@ -564,6 +654,50 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 							connectBtn.addEventListener('click', () => {
 								// Trigger GitHub login with VS Code authentication
 								vscode.postMessage({ command: 'githubLogin' });
+							});
+						}
+						
+						// Manual token authentication event listeners
+						if (saveTokenBtn) {
+							saveTokenBtn.addEventListener('click', () => {
+								const token = githubTokenInput ? githubTokenInput.value.trim() : '';
+								if (token) {
+									vscode.postMessage({ command: 'saveManualToken', token: token });
+									if (githubTokenInput) githubTokenInput.value = ''; // Clear input for security
+								}
+							});
+						}
+						
+						if (clearTokenBtn) {
+							clearTokenBtn.addEventListener('click', () => {
+								vscode.postMessage({ command: 'clearManualToken' });
+								if (githubTokenInput) githubTokenInput.value = '';
+							});
+						}
+						
+						if (tokenInstructionsLink) {
+							tokenInstructionsLink.addEventListener('click', (e) => {
+								e.preventDefault();
+								if (tokenInstructionsModal) tokenInstructionsModal.style.display = 'flex';
+							});
+						}
+						
+						if (closeInstructionsBtn) {
+							closeInstructionsBtn.addEventListener('click', () => {
+								if (tokenInstructionsModal) tokenInstructionsModal.style.display = 'none';
+							});
+						}
+						
+						// Allow Enter key to save token
+						if (githubTokenInput) {
+							githubTokenInput.addEventListener('keypress', (e) => {
+								if (e.key === 'Enter') {
+									const token = githubTokenInput.value.trim();
+									if (token) {
+										vscode.postMessage({ command: 'saveManualToken', token: token });
+										githubTokenInput.value = ''; // Clear input for security
+									}
+								}
 							});
 						}
 
@@ -654,7 +788,24 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 						// Handle authentication status updates
 						if (message.command === 'updateAuthStatus') {
 							if (authStatus) authStatus.textContent = message.status;
-							if (connectBtn) connectBtn.style.display = message.isAuthenticated ? 'none' : '';
+							
+							// Show/hide authentication sections based on availability and status
+							if (message.isAuthenticated) {
+								// User is authenticated, hide both auth sections
+								if (vsCodeAuthSection) vsCodeAuthSection.style.display = 'none';
+								if (manualAuthSection) manualAuthSection.style.display = 'none';
+							} else {
+								// User is not authenticated, show appropriate auth method
+								if (message.vsCodeAuthAvailable) {
+									// VS Code auth available (VS Code environment)
+									if (vsCodeAuthSection) vsCodeAuthSection.style.display = 'block';
+									if (manualAuthSection) manualAuthSection.style.display = 'none';
+								} else {
+									// VS Code auth not available (Cursor or other), show manual auth
+									if (vsCodeAuthSection) vsCodeAuthSection.style.display = 'none';
+									if (manualAuthSection) manualAuthSection.style.display = 'block';
+								}
+							}
 							return;
 						}
 					});

@@ -46,6 +46,36 @@ export class GithubService implements vscode.Disposable {
   }
 
   /**
+   * Check if VS Code's built-in GitHub authentication is available
+   */
+  async isVSCodeAuthAvailable(): Promise<boolean> {
+    try {
+      // Try to get existing session without creating one
+      await vscode.authentication.getSession('github', ['repo'], { createIfNone: false });
+      return true;
+    } catch (error) {
+      // VS Code auth not available or no existing session
+      return false;
+    }
+  }
+
+  /**
+   * Authenticate with GitHub using VS Code's built-in authentication
+   */
+  async authenticateWithVSCode(): Promise<boolean> {
+    try {
+      const session = await vscode.authentication.getSession('github', ['repo'], { createIfNone: true });
+      if (session) {
+        await this.setToken(session.accessToken);
+        return true;
+      }
+    } catch (error) {
+      console.log('VS Code GitHub authentication not available, fallback to manual token');
+    }
+    return false;
+  }
+
+  /**
    * Authenticate with GitHub by checking if a token is set
    * If not, prompt the user to enter a token (handled in UI)
    */
