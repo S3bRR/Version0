@@ -62,7 +62,7 @@
       "properties": {
         "version0.backupInterval": {
           "type": "number",
-          "default": 10,
+          "default": 9999,
           "description": "Automatic backup interval in minutes for the open workspace."
         },
         "version0.targetBackupRepoUrl": {

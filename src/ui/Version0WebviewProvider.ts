@@ -300,7 +300,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 	public updateWebviewState() {
                 if (this._view) {
 			const frequency = this._configManager.getBackupInterval().toString();
-			const targetRepoUrl = this._configManager.getTargetBackupRepoUrl() || '';
+			const targetRepoUrl = ''; // Always send empty target repo URL
 			this._view.webview.postMessage({
 				command: 'updateState',
 				frequency,
@@ -336,7 +336,7 @@ export class Version0WebviewProvider implements vscode.WebviewViewProvider {
 
 		const nonce = getNonce();
 		const currentFrequency = this._configManager.getBackupInterval().toString();
-		const currentTargetRepoUrl = this._configManager.getTargetBackupRepoUrl() || '';
+		const currentTargetRepoUrl = ''; // Always start with empty target repo URL
 
 		return `<!DOCTYPE html>
 			<html lang="en">

@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 export class ConfigManager {
   private context: vscode.ExtensionContext;
   private configuration: vscode.WorkspaceConfiguration;
+  private sessionTargetRepoUrl: string | undefined = undefined;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
@@ -29,18 +30,19 @@ export class ConfigManager {
     await this.context.secrets.store('version0.githubToken', token);
   }
   
-  // Target Repository Setting
+  // Target Repository Setting (Session-only)
   getTargetBackupRepoUrl(): string | undefined {
-    return this.configuration.get<string>('targetBackupRepoUrl') || undefined;
+    return this.sessionTargetRepoUrl;
   }
 
   async setTargetBackupRepoUrl(url: string): Promise<void> {
-    await this.configuration.update('targetBackupRepoUrl', url, vscode.ConfigurationTarget.Global);
+    // Store only in session, not in persistent configuration
+    this.sessionTargetRepoUrl = url;
   }
   
   // Settings getters
   getBackupInterval(): number {
-    return this.configuration.get<number>('backupInterval') || 10;
+    return this.configuration.get<number>('backupInterval') || 9999;
   }
   
   getEnableNotifications(): boolean {
