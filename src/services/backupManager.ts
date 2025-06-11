@@ -3,12 +3,14 @@ import simpleGit, { SimpleGit, CheckRepoActions } from 'simple-git';
 import moment from 'moment';
 import { GithubService } from './githubService';
 import { ConfigManager } from './configManager';
+import { ErrorHandler, ErrorType } from '../utils/errorHandler';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
 export class BackupManager implements vscode.Disposable {
   private githubService: GithubService;
   private configManager: ConfigManager;
+  private errorHandler: ErrorHandler;
   private timer: NodeJS.Timeout | undefined;
   private git: SimpleGit | undefined;
   private workspaceRoot: string | undefined;
@@ -17,9 +19,9 @@ export class BackupManager implements vscode.Disposable {
   constructor(githubService: GithubService, configManager: ConfigManager) {
     this.githubService = githubService;
     this.configManager = configManager;
+    this.errorHandler = ErrorHandler.getInstance();
     this.initializeGit().catch(err => {
-        console.error("Version0: Failed to initialize Git on construction:", err.message);
-        // Non-critical here, as it will be re-attempted before operations
+        this.errorHandler.handleError(err, 'Git initialization on construction');
     });
   }
 
@@ -103,7 +105,11 @@ export class BackupManager implements vscode.Disposable {
   }
 
   public async triggerManualBackup(): Promise<void> {
-    await this.performBackup(true);
+    return this.errorHandler.withProgress('Manual backup in progress...', async (progress) => {
+      progress.report({ increment: 0, message: 'Starting backup...' });
+      await this.performBackup(true);
+      progress.report({ increment: 100, message: 'Backup completed!' });
+    });
   }
 
   private async tryFixGitCorruption(): Promise<boolean> {
@@ -190,14 +196,24 @@ export class BackupManager implements vscode.Disposable {
     // Get target URL for the backup remote
     const targetRepoUrl = this.configManager.getTargetBackupRepoUrl();
     if (!targetRepoUrl) {
-      throw new Error("Backup failed: Target backup repository URL is not configured in settings. Please set it first (e.g., by creating a repo).");
+      throw this.errorHandler.createError(
+        ErrorType.CONFIGURATION,
+        "Target backup repository URL is not configured in settings",
+        "Backup operation",
+        true
+      );
     }
 
     // Ensure GitHub authentication
     if (!await this.githubService.isAuthenticated()) {
       const authenticated = await this.githubService.authenticate();
       if (!authenticated) {
-        throw new Error("Backup failed: GitHub authentication required. Please authenticate and try again.");
+        throw this.errorHandler.createError(
+          ErrorType.AUTHENTICATION,
+          "GitHub authentication required. Please authenticate and try again",
+          "Backup operation",
+          true
+        );
       }
     }
     

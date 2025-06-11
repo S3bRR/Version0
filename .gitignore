@@ -41,3 +41,13 @@ desktop.ini
 # Backup and temporary files
 *.bak
 *.old
+
+# Claude.ai development files
+CLAUDE.md
+claude.md
+
+# Test files (development only)
+/test/unit/
+
+# Development dependencies
+.nycrc.json

@@ -17,6 +17,9 @@ const config = {
   resolve: {
     extensions: ['.ts', '.js']
   },
+  stats: {
+    errorDetails: false
+  },
   module: {
     rules: [
       {

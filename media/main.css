@@ -1,122 +1,573 @@
-/* Custom styling for Version0 extension */
+/* Modern Version0 Extension Styling */
 
+:root {
+  /* Custom design tokens */
+  --v0-primary: var(--vscode-button-background);
+  --v0-primary-hover: var(--vscode-button-hoverBackground);
+  --v0-secondary: var(--vscode-button-secondaryBackground);
+  --v0-secondary-hover: var(--vscode-button-secondaryHoverBackground);
+  --v0-surface: var(--vscode-editor-background);
+  --v0-surface-elevated: var(--vscode-sideBar-background);
+  --v0-border: var(--vscode-panel-border);
+  --v0-border-subtle: var(--vscode-widget-border);
+  --v0-text-primary: var(--vscode-foreground);
+  --v0-text-secondary: var(--vscode-descriptionForeground);
+  --v0-text-muted: var(--vscode-disabledForeground);
+  --v0-success: var(--vscode-testing-iconPassed);
+  --v0-warning: var(--vscode-notificationsWarningIcon-foreground);
+  --v0-error: var(--vscode-errorForeground);
+  --v0-info: var(--vscode-notificationsInfoIcon-foreground);
+  
+  /* Spacing system */
+  --v0-space-xs: 4px;
+  --v0-space-sm: 8px;
+  --v0-space-md: 12px;
+  --v0-space-lg: 16px;
+  --v0-space-xl: 24px;
+  --v0-space-2xl: 32px;
+  
+  /* Border radius */
+  --v0-radius-sm: 3px;
+  --v0-radius-md: 6px;
+  --v0-radius-lg: 12px;
+  
+  /* Shadows */
+  --v0-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+  --v0-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --v0-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  
+  /* Transitions */
+  --v0-transition-fast: 150ms ease-in-out;
+  --v0-transition-normal: 200ms ease-in-out;
+  --v0-transition-slow: 300ms ease-in-out;
+}
+
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--vscode-font-family);
+  color: var(--v0-text-primary);
+  background-color: var(--v0-surface);
+  padding: var(--v0-space-lg);
+  font-size: var(--vscode-font-size);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Typography */
 h2 {
-    margin-top: 5px;
-    margin-bottom: 20px;
-    font-size: 1.5em;
-    font-weight: 500;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--v0-text-primary);
+  margin: 0 0 var(--v0-space-xl) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--v0-space-sm);
+}
+
+h2::before {
+  content: '';
+  width: 4px;
+  height: 24px;
+  background: linear-gradient(135deg, var(--v0-primary), var(--v0-secondary));
+  border-radius: var(--v0-radius-sm);
 }
 
 h3 {
-    margin-top: 15px;
-    font-size: 1.2em;
-    font-weight: 500;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--v0-text-primary);
+  margin: var(--v0-space-xl) 0 var(--v0-space-md) 0;
+  padding-bottom: var(--v0-space-xs);
+  border-bottom: 1px solid var(--v0-border-subtle);
 }
 
-/* General div margin, can be overridden by more specific rules */
-div:not(.modal):not(.modal-content):not(.modal-buttons):not(.button-group):not(.inline-form-group) {
-    margin-bottom: 10px;
-}
-
-input[type="text"], input[type="number"] {
-    width: 60%;
-    min-width: 150px;
-}
-
-input[type="number"] {
-    width: 80px;
-}
-
-#branchesContainer {
-    background-color: var(--vscode-editor-background);
-}
-
-/* Style for the whole form layout */
+/* Main container */
 .form-container {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--v0-space-lg);
+  max-width: 100%;
 }
 
-/* Make sure buttons in a group are the same width */
-.button-group button {
-    flex: 1;
+/* Card component */
+.v0-card {
+  background: var(--v0-surface-elevated);
+  border: 1px solid var(--v0-border);
+  border-radius: var(--v0-radius-md);
+  padding: var(--v0-space-lg);
+  box-shadow: var(--v0-shadow-sm);
+  transition: box-shadow var(--v0-transition-normal);
 }
 
-/* Styles for inline frequency group */
+.v0-card:hover {
+  box-shadow: var(--v0-shadow-md);
+}
+
+/* Form groups */
+.vertical-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v0-space-sm);
+  margin-bottom: var(--v0-space-md);
+}
+
 .inline-form-group {
   display: flex;
   align-items: center;
-  gap: 8px; 
-  margin-bottom: 10px;
+  gap: var(--v0-space-sm);
+  margin-bottom: var(--v0-space-md);
+  flex-wrap: wrap;
 }
 
 .inline-form-group label {
-   width: 120px; /* Set a fixed width for labels in inline groups */
-   flex-shrink: 0; /* Prevent label from shrinking */
-   margin-right: 5px; 
+  min-width: 120px;
+  flex-shrink: 0;
+  font-weight: 500;
+  color: var(--v0-text-secondary);
 }
 
-.inline-form-group input[type="number"] {
-  width: 60px; 
-  flex-grow: 0; /* Don't grow */
+/* Labels */
+label {
+  font-weight: 500;
+  color: var(--v0-text-secondary);
+  margin-bottom: var(--v0-space-xs);
+  font-size: 0.9rem;
 }
 
-.inline-form-group input[type="text"] {
-  flex-grow: 1; /* Allow text input to take available space */
-  min-width: 150px;
+/* Input styles */
+input[type="text"], 
+input[type="number"],
+input[type="password"] {
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: var(--v0-radius-sm);
+  padding: var(--v0-space-sm) var(--v0-space-md);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  transition: all var(--v0-transition-fast);
+  width: 100%;
 }
 
-.inline-form-group button {
-    flex-shrink: 0; /* Prevent button from shrinking */
+input[type="number"] {
+  max-width: 120px;
 }
 
-/* Modal Styles */
+input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+input::placeholder {
+  color: var(--v0-text-muted);
+  opacity: 0.7;
+}
+
+/* Button styles */
+.v0-button {
+  background-color: var(--v0-primary);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: var(--v0-radius-sm);
+  padding: var(--v0-space-sm) var(--v0-space-lg);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--v0-transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v0-space-xs);
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+.v0-button:hover {
+  background-color: var(--v0-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--v0-shadow-sm);
+}
+
+.v0-button:active {
+  transform: translateY(0);
+}
+
+.v0-button--secondary {
+  background-color: var(--v0-secondary);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.v0-button--secondary:hover {
+  background-color: var(--v0-secondary-hover);
+}
+
+.v0-button--small {
+  padding: var(--v0-space-xs) var(--v0-space-md);
+  font-size: 0.85rem;
+  min-height: 28px;
+}
+
+.v0-button--icon {
+  padding: var(--v0-space-xs);
+  width: 32px;
+  height: 32px;
+}
+
+.v0-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Apply button styles to existing buttons */
+button {
+  @extend .v0-button;
+}
+
+button:not(.v0-button):not(.restore-button):not(.modal button) {
+  background-color: var(--v0-primary);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: var(--v0-radius-sm);
+  padding: var(--v0-space-sm) var(--v0-space-lg);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--v0-transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v0-space-xs);
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+button:not(.v0-button):not(.restore-button):not(.modal button):hover {
+  background-color: var(--v0-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--v0-shadow-sm);
+}
+
+/* Button groups */
+.button-group {
+  display: flex;
+  gap: var(--v0-space-sm);
+  flex-wrap: wrap;
+  margin: var(--v0-space-md) 0;
+}
+
+.button-group button {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Status indicators */
+.status-container {
+  display: flex;
+  align-items: center;
+  gap: var(--v0-space-sm);
+  padding: var(--v0-space-md);
+  background: var(--v0-surface-elevated);
+  border-radius: var(--v0-radius-md);
+  border: 1px solid var(--v0-border);
+  margin: var(--v0-space-md) 0;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-indicator--success {
+  background-color: var(--v0-success);
+}
+
+.status-indicator--warning {
+  background-color: var(--v0-warning);
+}
+
+.status-indicator--error {
+  background-color: var(--v0-error);
+}
+
+.status-indicator--info {
+  background-color: var(--v0-info);
+}
+
+#status {
+  color: var(--v0-text-secondary);
+  font-style: italic;
+  font-size: 0.9rem;
+  padding: var(--v0-space-sm);
+  background: var(--v0-surface-elevated);
+  border-radius: var(--v0-radius-sm);
+  border-left: 3px solid var(--v0-info);
+  margin: var(--v0-space-md) 0;
+}
+
+/* Branches container */
+#branchesContainer {
+  background: var(--v0-surface-elevated);
+  border: 1px solid var(--v0-border);
+  border-radius: var(--v0-radius-md);
+  padding: var(--v0-space-md);
+  max-height: 300px;
+  overflow-y: auto;
+  margin: var(--v0-space-md) 0;
+}
+
+#branchesContainer ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#branchesContainer li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--v0-space-sm) 0;
+  border-bottom: 1px solid var(--v0-border-subtle);
+  transition: background-color var(--v0-transition-fast);
+}
+
+#branchesContainer li:last-child {
+  border-bottom: none;
+}
+
+#branchesContainer li:hover {
+  background-color: var(--vscode-list-hoverBackground);
+  border-radius: var(--v0-radius-sm);
+  padding-left: var(--v0-space-sm);
+  padding-right: var(--v0-space-sm);
+}
+
+.restore-button {
+  background-color: var(--v0-secondary);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  border-radius: var(--v0-radius-sm);
+  padding: var(--v0-space-xs) var(--v0-space-md);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all var(--v0-transition-fast);
+  font-weight: 500;
+}
+
+.restore-button:hover {
+  background-color: var(--v0-secondary-hover);
+  transform: translateY(-1px);
+}
+
+/* Authentication section */
+.auth-section {
+  background: var(--v0-surface-elevated);
+  border: 1px solid var(--v0-border);
+  border-radius: var(--v0-radius-md);
+  padding: var(--v0-space-lg);
+  margin: var(--v0-space-xl) 0;
+}
+
+.auth-help {
+  margin-top: var(--v0-space-sm);
+  color: var(--v0-text-muted);
+  font-size: 0.85rem;
+}
+
+#github-auth-status {
+  padding: var(--v0-space-sm);
+  background: var(--v0-surface);
+  border-radius: var(--v0-radius-sm);
+  margin: var(--v0-space-sm) 0;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9rem;
+}
+
+/* Modal styles */
 .modal {
   position: fixed;
-  left: 0;
   top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0,0,0,0.6);
-  display: flex; /* Will be set to flex by JS to show */
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  opacity: 0;
+  animation: modalFadeIn var(--v0-transition-normal) ease-out forwards;
+}
+
+@keyframes modalFadeIn {
+  to { opacity: 1; }
 }
 
 .modal-content {
-  background-color: var(--vscode-editor-background);
-  color: var(--vscode-editor-foreground);
-  padding: 25px;
-  border-radius: 5px;
-  border: 1px solid var(--vscode-panel-border, var(--vscode-contrastBorder, #333));
-  min-width: 350px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  background: var(--v0-surface-elevated);
+  border: 1px solid var(--v0-border);
+  border-radius: var(--v0-radius-lg);
+  padding: var(--v0-space-2xl);
+  box-shadow: var(--v0-shadow-lg);
+  min-width: 400px;
+  max-width: 90vw;
+  animation: modalSlideIn var(--v0-transition-normal) ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .modal-content h4 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  font-size: 1.3em;
+  margin: 0 0 var(--v0-space-lg) 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--v0-text-primary);
 }
 
 .modal-content label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: var(--v0-space-sm);
   font-weight: 500;
-  width: auto; /* Ensure label takes natural width */
+  color: var(--v0-text-secondary);
 }
 
 .modal-content input[type="text"] {
-  width: calc(100% - 12px); /* Full width minus padding */
-  margin-bottom: 20px;
-  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+  width: 100%;
+  margin-bottom: var(--v0-space-lg);
 }
 
 .modal-buttons {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 10px;
-} 
+  gap: var(--v0-space-md);
+  margin-top: var(--v0-space-lg);
+}
+
+.modal-buttons button {
+  min-width: 80px;
+}
+
+/* Loading states */
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid var(--v0-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Progress indicators */
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--v0-border);
+  border-radius: var(--v0-radius-sm);
+  overflow: hidden;
+  margin: var(--v0-space-sm) 0;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--v0-primary), var(--v0-secondary));
+  border-radius: var(--v0-radius-sm);
+  transition: width var(--v0-transition-normal);
+}
+
+/* Responsive design */
+@media (max-width: 600px) {
+  body {
+    padding: var(--v0-space-md);
+  }
+  
+  .button-group {
+    flex-direction: column;
+  }
+  
+  .button-group button {
+    min-width: unset;
+  }
+  
+  .inline-form-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .inline-form-group label {
+    min-width: unset;
+  }
+  
+  .modal-content {
+    min-width: unset;
+    margin: var(--v0-space-lg);
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus visible improvements */
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .v0-card {
+    border-width: 2px;
+  }
+  
+  button {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Dark theme specific adjustments */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --v0-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --v0-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    --v0-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  }
+}
